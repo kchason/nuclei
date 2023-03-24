@@ -231,8 +231,8 @@ type Options struct {
 	// UpdateTemplates updates the templates installed at startup
 	UpdateTemplates bool
 	// JSON writes json output to files
-	JSON bool
-	// JSONRequests writes requests/responses for matches in JSON output
+	JSONL bool
+	// JSONRequests writes requests/responses for matches in JSON line output
 	JSONRequests bool
 	// Cloud enables nuclei cloud scan execution
 	Cloud bool
