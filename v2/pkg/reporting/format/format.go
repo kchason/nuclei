@@ -59,7 +59,7 @@ func MarkdownDescription(event *output.ResultEvent) string { // TODO remove the 
 		var responseString string
 		// If the response is larger than 5 kb, truncate it before writing.
 		if len(event.Response) > 5*1024 {
-			responseString = (event.Response[:5*1024])
+			responseString = event.Response[:5*1024]
 			responseString += ".... Truncated ...."
 		} else {
 			responseString = event.Response

@@ -13,7 +13,7 @@ import (
 	stringsutil "github.com/projectdiscovery/utils/strings"
 )
 
-type options struct {
+type Options struct {
 	Templates            goflags.StringSlice
 	Algorithm            string
 	PrivateKeyName       string
@@ -21,8 +21,8 @@ type options struct {
 	PublicKeyName        string
 }
 
-func ParseOptions() (*options, error) {
-	opts := &options{}
+func ParseOptions() (*Options, error) {
+	opts := &Options{}
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`sign-templates is a utility to perform template signature`)
 

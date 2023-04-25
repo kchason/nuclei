@@ -40,7 +40,7 @@ func New(options *Options) (*Exporter, error) {
 	return exporter, nil
 }
 
-// addToolDetails adds details of static analysis tool (i.e nuclei)
+// addToolDetails adds details of static analysis tool (i.e. nuclei)
 func (exporter *Exporter) addToolDetails() {
 	driver := sarif.ToolComponent{
 		Name:         "Nuclei",

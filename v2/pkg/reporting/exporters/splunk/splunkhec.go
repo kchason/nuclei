@@ -73,14 +73,14 @@ func New(option *Options) (*Exporter, error) {
 	// Authentication header for HEC
 	authentication := "Splunk " + option.Token
 
-	// add HEC endpoint, index, source, sourcetype
+	// add HEC endpoint, index, source, sourceType
 	addr := option.Host
 	if option.Port > 0 {
 		addr = net.JoinHostPort(addr, fmt.Sprint(option.Port))
 	}
-	base_url := fmt.Sprintf("%s%s", scheme, addr)
-	sourcetype := "nuclei:splunk-hec:exporter:json"
-	url := fmt.Sprintf("%s/services/collector/event?index=%s&sourcetype=%s&source=%s", base_url, option.IndexName, sourcetype, base_url)
+	baseUrl := fmt.Sprintf("%s%s", scheme, addr)
+	sourceType := "nuclei:splunk-hec:exporter:json"
+	url := fmt.Sprintf("%s/services/collector/event?index=%s&sourceType=%s&source=%s", baseUrl, option.IndexName, sourceType, baseUrl)
 
 	ei = &Exporter{
 		url:            url,

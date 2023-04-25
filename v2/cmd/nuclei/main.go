@@ -258,7 +258,7 @@ on extensive configurability, massive extensibility and ease of use.`)
 			scanstrategy.HostSpray.String():     goflags.EnumVariable(1),
 			scanstrategy.TemplateSpray.String(): goflags.EnumVariable(2),
 		}),
-		flagSet.DurationVarP(&options.InputReadTimeout, "input-read-timeout", "irt", time.Duration(3*time.Minute), "timeout on input read"),
+		flagSet.DurationVarP(&options.InputReadTimeout, "input-read-timeout", "irt", 3*time.Minute, "timeout on input read"),
 		flagSet.BoolVarP(&options.DisableHTTPProbe, "no-httpx", "nh", false, "disable httpx probing for non-url input"),
 		flagSet.BoolVar(&options.DisableStdin, "no-stdin", false, "disable stdin processing"),
 	)
@@ -390,7 +390,7 @@ func readFlagsConfig(flagset *goflags.FlagSet) {
 			gologger.Warning().Msgf("missing default config file : %s", defaultCfgFile)
 			return
 		}
-		// if does not exist copy it from the default config
+		// if the config does not exist copy it from the default config
 		if err = fileutil.CopyFile(defaultCfgFile, cfgFile); err != nil {
 			gologger.Warning().Msgf("Could not copy config file: %s\n", err)
 		}

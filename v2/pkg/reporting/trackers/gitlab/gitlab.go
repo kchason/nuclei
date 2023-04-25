@@ -38,7 +38,7 @@ type Options struct {
 
 // New creates a new issue tracker integration client based on options.
 func New(options *Options) (*Integration, error) {
-	gitlabOpts := []gitlab.ClientOptionFunc{}
+	var gitlabOpts []gitlab.ClientOptionFunc
 	if options.BaseURL != "" {
 		gitlabOpts = append(gitlabOpts, gitlab.WithBaseURL(options.BaseURL))
 	}
@@ -60,7 +60,7 @@ func New(options *Options) (*Integration, error) {
 func (i *Integration) CreateIssue(event *output.ResultEvent) error {
 	summary := format.Summary(event)
 	description := format.MarkdownDescription(event)
-	labels := []string{}
+	var labels []string
 	severityLabel := fmt.Sprintf("Severity: %s", event.Info.SeverityHolder.Severity.String())
 	if i.options.SeverityAsLabel && severityLabel != "" {
 		labels = append(labels, severityLabel)

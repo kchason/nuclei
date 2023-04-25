@@ -28,7 +28,7 @@ type Integration struct {
 type Options struct {
 	// BaseURL (optional) is the self-hosted GitHub application url
 	BaseURL string `yaml:"base-url" validate:"omitempty,url"`
-	// Username is the username of the github user
+	// Username is the username of the GitHub user
 	Username string `yaml:"username" validate:"required"`
 	// Owner is the owner name of the repository for issues.
 	Owner string `yaml:"owner" validate:"required"`
@@ -79,7 +79,7 @@ func New(options *Options) (*Integration, error) {
 func (i *Integration) CreateIssue(event *output.ResultEvent) error {
 	summary := format.Summary(event)
 	description := format.MarkdownDescription(event)
-	labels := []string{}
+	var labels []string
 	severityLabel := fmt.Sprintf("Severity: %s", event.Info.SeverityHolder.Severity.String())
 	if i.options.SeverityAsLabel && severityLabel != "" {
 		labels = append(labels, severityLabel)

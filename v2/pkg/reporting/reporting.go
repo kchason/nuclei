@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
-	json_exporter "github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/jsonexporter"
+	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/jsonexporter"
 	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/jsonl"
 
 	"go.uber.org/multierr"
@@ -136,7 +136,7 @@ func New(options *Options, db string) (Client, error) {
 		client.exporters = append(client.exporters, exporter)
 	}
 	if options.JSONExporter != nil {
-		exporter, err := json_exporter.New(options.JSONExporter)
+		exporter, err := jsonexporter.New(options.JSONExporter)
 		if err != nil {
 			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
 		}
@@ -174,7 +174,7 @@ func New(options *Options, db string) (Client, error) {
 	return client, nil
 }
 
-// CreateConfigIfNotExists creates report-config if it doesn't exists
+// CreateConfigIfNotExists creates report-config if it doesn't exist
 func CreateConfigIfNotExists() error {
 	reportingConfig := config.DefaultConfig.GetReportingConfigFilePath()
 
@@ -193,7 +193,7 @@ func CreateConfigIfNotExists() error {
 		SarifExporter:         &sarif.Options{},
 		ElasticsearchExporter: &es.Options{},
 		SplunkExporter:        &splunk.Options{},
-		JSONExporter:          &json_exporter.Options{},
+		JSONExporter:          &jsonexporter.Options{},
 		JSONLExporter:         &jsonl.Options{},
 	}
 	reportingFile, err := os.Create(reportingConfig)
