@@ -101,7 +101,7 @@ func (exporter *Exporter) Export(event *output.ResultEvent) error {
 	resultHeader := fmt.Sprintf("%v (%v) found on %v", event.Info.Name, event.TemplateID, event.Host)
 	resultLevel, vulnRating := exporter.getSeverity(severity)
 
-	// Extra metdata if generated sarif is uploaded to github security page
+	// Extra metdata if generated sarif is uploaded to GitHub security page
 	ghmeta := map[string]interface{}{}
 	ghmeta["tags"] = []string{"security"}
 	ghmeta["security-severity"] = vulnRating
@@ -117,7 +117,7 @@ func (exporter *Exporter) Export(event *output.ResultEvent) error {
 		Properties: ghmeta,
 	}
 
-	// Github Uses ShortDescription as title
+	// GitHub Uses ShortDescription as title
 	if event.Info.Description != "" {
 		rule.ShortDescription = &sarif.MultiformatMessageString{
 			Text: resultHeader,
@@ -140,7 +140,7 @@ func (exporter *Exporter) Export(event *output.ResultEvent) error {
 		},
 		PhysicalLocation: sarif.PhysicalLocation{
 			ArtifactLocation: sarif.ArtifactLocation{
-				// github only accepts file:// protocol and local & relative files only
+				// GitHub only accepts file:// protocol and local & relative files only
 				// to avoid errors // is used which also translates to file according to specification
 				Uri: "/" + event.Path,
 				Description: &sarif.Message{
