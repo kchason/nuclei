@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/codeclimate"
 	"os"
 
 	"github.com/projectdiscovery/nuclei/v2/pkg/catalog/config"
@@ -160,6 +161,13 @@ func New(options *Options, db string) (Client, error) {
 	if options.SplunkExporter != nil {
 		options.SplunkExporter.HttpClient = options.HttpClient
 		exporter, err := splunk.New(options.SplunkExporter)
+		if err != nil {
+			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
+		}
+		client.exporters = append(client.exporters, exporter)
+	}
+	if options.CodeClimateExporter != nil {
+		exporter, err := codeclimate.New(options.CodeClimateExporter)
 		if err != nil {
 			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
 		}

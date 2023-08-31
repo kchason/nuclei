@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/codeclimate"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -400,6 +401,18 @@ func createReportingOptions(options *types.Options) (*reporting.Options, error) 
 			reportingOptions.JSONLExporter = &jsonl.Options{
 				File:              options.JSONLExport,
 				IncludeRawPayload: !options.OmitRawRequests,
+			}
+		}
+	}
+	if options.CodeClimateExport != "" {
+		if reportingOptions != nil {
+			reportingOptions.CodeClimateExporter = &codeclimate.Options{
+				File: options.CodeClimateExport,
+			}
+		} else {
+			reportingOptions = &reporting.Options{}
+			reportingOptions.CodeClimateExporter = &codeclimate.Options{
+				File: options.CodeClimateExport,
 			}
 		}
 	}

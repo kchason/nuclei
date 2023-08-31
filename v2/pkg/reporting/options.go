@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/codeclimate"
 	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/es"
 	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/jsonexporter"
 	"github.com/projectdiscovery/nuclei/v2/pkg/reporting/exporters/jsonl"
@@ -37,6 +38,8 @@ type Options struct {
 	JSONExporter *jsonexporter.Options `yaml:"json"`
 	// JSONLExporter contains configuration options for JSONL Exporter Module
 	JSONLExporter *jsonl.Options `yaml:"jsonl"`
+	// CodeClimateExporter contains configuration options for CodeClimate Exporter Module
+	CodeClimateExporter *codeclimate.Options `yaml:"codeclimate"`
 
 	HttpClient *retryablehttp.Client `yaml:"-"`
 }
