@@ -361,6 +361,7 @@ func readEnvInputVars(options *types.Options) {
 	options.CloudAPIKey = os.Getenv("NUCLEI_CLOUD_API")
 
 	options.GitHubToken = os.Getenv("GITHUB_TOKEN")
+	options.GitHubBranch = os.Getenv("GITHUB_BRANCH")
 	repolist := os.Getenv("GITHUB_TEMPLATE_REPO")
 	if repolist != "" {
 		options.GitHubTemplateRepo = append(options.GitHubTemplateRepo, stringsutil.SplitAny(repolist, ",")...)

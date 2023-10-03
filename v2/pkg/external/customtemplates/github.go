@@ -2,6 +2,8 @@ package customtemplates
 
 import (
 	"context"
+	"fmt"
+	"github.com/go-git/go-git/v5/plumbing"
 	httpclient "net/http"
 	"path/filepath"
 	"strings"
@@ -24,6 +26,7 @@ type customTemplateGitHubRepo struct {
 	reponame    string
 	gitCloneURL string
 	githubToken string
+	branch      string
 }
 
 // This function download the custom github template repository
@@ -34,6 +37,8 @@ func (customTemplate *customTemplateGitHubRepo) Download(ctx context.Context) {
 		err := customTemplate.cloneRepo(clonePath, customTemplate.githubToken)
 		if err != nil {
 			gologger.Error().Msgf("%s", err)
+		} else if customTemplate.branch != "" {
+			gologger.Info().Msgf("Repo %s/%s (%s) cloned successfully at %s", customTemplate.owner, customTemplate.reponame, customTemplate.branch, clonePath)
 		} else {
 			gologger.Info().Msgf("Repo %s/%s cloned successfully at %s", customTemplate.owner, customTemplate.reponame, clonePath)
 		}
@@ -45,7 +50,7 @@ func (customTemplate *customTemplateGitHubRepo) Update(ctx context.Context) {
 	downloadPath := config.DefaultConfig.CustomGitHubTemplatesDirectory
 	clonePath := customTemplate.getLocalRepoClonePath(downloadPath)
 
-	// If folder does not exits then clone/download the repo
+	// If folder does not exist then clone/download the repo
 	if !fileutil.FolderExists(clonePath) {
 		customTemplate.Download(ctx)
 		return
@@ -83,6 +88,7 @@ func NewGitHubProviders(options *types.Options) ([]*customTemplateGitHubRepo, er
 			reponame:    repo,
 			gitCloneURL: githubRepo.GetCloneURL(),
 			githubToken: options.GitHubToken,
+			branch:      options.GitHubBranch,
 		}
 		providers = append(providers, customTemplateRepo)
 	}
@@ -125,11 +131,32 @@ getRepo:
 // download the git repo to a given path
 func (ctr *customTemplateGitHubRepo) cloneRepo(clonePath, githubToken string) error {
 	r, err := git.PlainClone(clonePath, false, &git.CloneOptions{
-		URL:  ctr.gitCloneURL,
-		Auth: getAuth(ctr.owner, githubToken),
+		URL:          ctr.gitCloneURL,
+		Auth:         getAuth(ctr.owner, githubToken),
+		SingleBranch: false,
 	})
+	// If the ctr.branch is set then checkout to that branch
+	if ctr.branch != "" {
+
+		// Checkout the specified branch
+		tree, err := r.Worktree()
+		if err != nil {
+			return errors.Errorf("%s/%s (%s): %s", ctr.owner, ctr.reponame, ctr.branch, err.Error())
+		}
+
+		err = tree.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", ctr.branch)),
+			Create: false,
+			Force:  true,
+		})
+
+		if err != nil {
+			return errors.Errorf("Error checking out branch (%s) from repository %s/%s : %s", ctr.branch, ctr.owner, ctr.reponame, err.Error())
+		}
+	}
+
 	if err != nil {
-		return errors.Errorf("%s/%s: %s", ctr.owner, ctr.reponame, err.Error())
+		return errors.Errorf("%s/%s (%s): %s", ctr.owner, ctr.reponame, ctr.branch, err.Error())
 	}
 	// Add the user as well in the config. By default, user is not set
 	config, _ := r.Storer.Config()
@@ -147,6 +174,16 @@ func (ctr *customTemplateGitHubRepo) pullChanges(repoPath, githubToken string) e
 	if err != nil {
 		return err
 	}
+	if ctr.branch != "" {
+		err = w.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", ctr.branch)),
+			Create: false,
+			Force:  true,
+		})
+		if err != nil {
+			return errors.Errorf("Error checking out branch (%s) from repository %s/%s : %s", ctr.branch, ctr.owner, ctr.reponame, err.Error())
+		}
+	}
 	err = w.Pull(&git.PullOptions{RemoteName: "origin", Auth: getAuth(ctr.owner, githubToken)})
 	if err != nil {
 		return errors.Errorf("%s/%s: %s", ctr.owner, ctr.reponame, err.Error())
@@ -159,7 +196,7 @@ func (ctr *customTemplateGitHubRepo) getLocalRepoClonePath(downloadPath string) 
 	return filepath.Join(downloadPath, ctr.reponame+"-"+ctr.owner)
 }
 
-// returns the auth object with username and github token as password
+// returns the auth object with username and GitHub token as password
 func getAuth(username, password string) *http.BasicAuth {
 	if username != "" && password != "" {
 		return &http.BasicAuth{Username: username, Password: password}

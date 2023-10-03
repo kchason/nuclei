@@ -350,6 +350,8 @@ type Options struct {
 	GitHubTemplateRepo []string
 	// GitHubTemplateDisableDownload disables downloading templates from custom GitHub repositories
 	GitHubTemplateDisableDownload bool
+	// GitHubBranch is the branch to use for custom templates, default is the project defined primary branch
+	GitHubBranch string
 	// GitLabServerURL is the gitlab server to use for custom templates
 	GitLabServerURL string
 	// GitLabToken used to clone/pull from private repos for custom templates
