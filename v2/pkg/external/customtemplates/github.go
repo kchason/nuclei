@@ -2,13 +2,13 @@ package customtemplates
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-git/go-git/v5/plumbing"
 	httpclient "net/http"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	github_config "github.com/go-git/go-git/v5/config"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
@@ -144,14 +144,27 @@ func (ctr *customTemplateGitHubRepo) cloneRepo(clonePath, githubToken string) er
 			return errors.Errorf("%s/%s (%s): %s", ctr.owner, ctr.reponame, ctr.branch, err.Error())
 		}
 
+		branchReference := plumbing.ReferenceName("refs/remotes/origin/" + ctr.branch)
+
+		// Fetch the repository to get all the latest remote branches
+		err = r.Fetch(&git.FetchOptions{RemoteName: "origin", Auth: getAuth(ctr.owner, githubToken)})
+		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return errors.Errorf("Unable to fetch %s/%s: %s", ctr.owner, ctr.reponame, err.Error())
+		}
+
+		// Check if the branch exists
+		_, err = r.Reference(branchReference, false)
+		if err != nil {
+			return errors.Errorf("Branch '%s' does not exist: %v", ctr.branch, err)
+		}
+
 		err = tree.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", ctr.branch)),
+			Branch: branchReference,
 			Create: false,
 			Force:  true,
 		})
-
 		if err != nil {
-			return errors.Errorf("Error checking out branch (%s) from repository %s/%s : %s", ctr.branch, ctr.owner, ctr.reponame, err.Error())
+			return errors.Errorf("Error checking out branch (%s) from repository %s/%s: %s", ctr.branch, ctr.owner, ctr.reponame, err.Error())
 		}
 	}
 
@@ -174,16 +187,39 @@ func (ctr *customTemplateGitHubRepo) pullChanges(repoPath, githubToken string) e
 	if err != nil {
 		return err
 	}
+
 	if ctr.branch != "" {
+		branchReference := plumbing.ReferenceName("refs/remotes/origin/" + ctr.branch)
+
+		// Fetch the repository to get all the latest remote branches
+		err = r.Fetch(&git.FetchOptions{
+			RemoteName: "origin",
+			Auth:       getAuth(ctr.owner, githubToken),
+			RefSpecs: []github_config.RefSpec{
+				"+refs/heads/*:refs/remotes/origin/*",
+			},
+		})
+		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return errors.Errorf("Unable to fetch %s/%s: %s", ctr.owner, ctr.reponame, err.Error())
+		}
+
+		// Check if the branch exists
+		_, err = r.Reference(branchReference, false)
+		if err != nil {
+			return errors.Errorf("Branch '%s' does not exist: %v", ctr.branch, err)
+		}
+
+		// Checkout the branch
 		err = w.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", ctr.branch)),
+			Branch: branchReference,
 			Create: false,
 			Force:  true,
 		})
 		if err != nil {
-			return errors.Errorf("Error checking out branch (%s) from repository %s/%s : %s", ctr.branch, ctr.owner, ctr.reponame, err.Error())
+			return errors.Errorf("Error checking out branch (%s) from repository %s/%s: %s", ctr.branch, ctr.owner, ctr.reponame, err.Error())
 		}
 	}
+
 	err = w.Pull(&git.PullOptions{RemoteName: "origin", Auth: getAuth(ctr.owner, githubToken)})
 	if err != nil {
 		return errors.Errorf("%s/%s: %s", ctr.owner, ctr.reponame, err.Error())
