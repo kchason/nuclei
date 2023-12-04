@@ -7,6 +7,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/markdown"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/sarif"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/splunk"
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/sqlite"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/trackers/github"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/trackers/gitlab"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/trackers/jira"
@@ -37,6 +38,8 @@ type Options struct {
 	JSONExporter *jsonexporter.Options `yaml:"json"`
 	// JSONLExporter contains configuration options for JSONL Exporter Module
 	JSONLExporter *jsonl.Options `yaml:"jsonl"`
+	// SQLiteExporter contains configuration options for SQLite Exporter Module
+	SQLiteExporter *sqlite.Options `yaml:"sqlite"`
 
 	HttpClient *retryablehttp.Client `yaml:"-"`
 }

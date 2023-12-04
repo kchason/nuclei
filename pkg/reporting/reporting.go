@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/sqlite"
 	"os"
 
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
@@ -160,6 +161,13 @@ func New(options *Options, db string) (Client, error) {
 	if options.SplunkExporter != nil {
 		options.SplunkExporter.HttpClient = options.HttpClient
 		exporter, err := splunk.New(options.SplunkExporter)
+		if err != nil {
+			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
+		}
+		client.exporters = append(client.exporters, exporter)
+	}
+	if options.SQLiteExporter != nil {
+		exporter, err := sqlite.New(options.SQLiteExporter)
 		if err != nil {
 			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
 		}

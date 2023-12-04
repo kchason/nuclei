@@ -148,6 +148,7 @@ OUTPUT:
    -se, -sarif-export string     file to export results in SARIF format
    -je, -json-export string      file to export results in JSON format
    -jle, -jsonl-export string    file to export results in JSONL(ine) format
+   -sqe, -sqlite-export string   file to export results in SQLite format
 
 CONFIGURATIONS:
    -config string                        path to the nuclei configuration file

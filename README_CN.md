@@ -152,7 +152,6 @@ Nuclei是一款注重于可配置性、可扩展性和易用性的基于模板�
    -ept, -exclude-type value[]           根据类型排除模板，可选值有：dns, file, http, headless, network, workflow, ssl, websocket, whois
    -tc, -template-condition string[]     根据表达式运行模板
    
-
 输出：
    -o, -output string                    输出发现的问题到文件
    -sresp, -store-resp                   将nuclei的所有请求和响应输出到目录
@@ -171,7 +170,7 @@ Nuclei是一款注重于可配置性、可扩展性和易用性的基于模板�
    -se, -sarif-export string             以SARIF格式导出结果
    -je, -json-export string              以JSON格式导出结果
    -jle, -jsonl-export string            以JSONL(ine)格式导出结果
-
+   -sqe, -sqlite-export string
 
 配置：
    -config string                        指定nuclei的配置文件

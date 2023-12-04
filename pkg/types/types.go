@@ -216,6 +216,8 @@ type Options struct {
 	JSONExport string
 	// JSONLExport is the file to export JSONL output format to
 	JSONLExport string
+	// SQLiteExport the name of the file to export the results to
+	SQLiteExport string
 	// EnableProgressBar enables progress bar
 	EnableProgressBar bool
 	// TemplateDisplay displays the template contents

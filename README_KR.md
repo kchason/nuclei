@@ -147,6 +147,7 @@ OUTPUT:
    -se, -sarif-export string     SARIF 형식으로 결과를 내보낼 파일
    -je, -json-export string      JSON 형식으로 결과를 내보낼 파일
    -jle, -jsonl-export string    JSONL(ine) 형식으로 결과를 내보낼 파일
+   -sqe, -sqlite-export string
 
 CONFIGURATIONS:
    -config string                        nuclei 구성 파일 경로
