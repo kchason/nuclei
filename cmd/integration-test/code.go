@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log"
+	"os"
 	"path/filepath"
 
 	osutils "github.com/projectdiscovery/utils/os"
@@ -12,14 +13,16 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/testutils"
 )
 
+var isCodeDisabled = func() bool { return osutils.IsWindows() && os.Getenv("CI") == "true" }
+
 var codeTestCases = []TestCaseInfo{
-	{Path: "protocols/code/py-snippet.yaml", TestCase: &codeSnippet{}},
-	{Path: "protocols/code/py-file.yaml", TestCase: &codeFile{}},
-	{Path: "protocols/code/py-env-var.yaml", TestCase: &codeEnvVar{}},
-	{Path: "protocols/code/unsigned.yaml", TestCase: &unsignedCode{}},
-	{Path: "protocols/code/py-nosig.yaml", TestCase: &codePyNoSig{}},
-	{Path: "protocols/code/py-interactsh.yaml", TestCase: &codeSnippet{}},
-	{Path: "protocols/code/ps1-snippet.yaml", TestCase: &codeSnippet{}, DisableOn: func() bool { return !osutils.IsWindows() }},
+	{Path: "protocols/code/py-snippet.yaml", TestCase: &codeSnippet{}, DisableOn: isCodeDisabled},
+	{Path: "protocols/code/py-file.yaml", TestCase: &codeFile{}, DisableOn: isCodeDisabled},
+	{Path: "protocols/code/py-env-var.yaml", TestCase: &codeEnvVar{}, DisableOn: isCodeDisabled},
+	{Path: "protocols/code/unsigned.yaml", TestCase: &unsignedCode{}, DisableOn: isCodeDisabled},
+	{Path: "protocols/code/py-nosig.yaml", TestCase: &codePyNoSig{}, DisableOn: isCodeDisabled},
+	{Path: "protocols/code/py-interactsh.yaml", TestCase: &codeSnippet{}, DisableOn: isCodeDisabled},
+	{Path: "protocols/code/ps1-snippet.yaml", TestCase: &codeSnippet{}, DisableOn: func() bool { return !osutils.IsWindows() || isCodeDisabled() }},
 }
 
 const (
@@ -30,6 +33,10 @@ const (
 var testcertpath = ""
 
 func init() {
+	if isCodeDisabled() {
+		// skip executing code protocol in CI on windows
+		return
+	}
 	// allow local file access to load content of file references in template
 	// in order to sign them for testing purposes
 	templates.TemplateSignerLFA()
@@ -80,7 +87,7 @@ type codeSnippet struct{}
 
 // Execute executes a test case and returns an error if occurred
 func (h *codeSnippet) Execute(filePath string) error {
-	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input")
+	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input", "-code")
 	if err != nil {
 		return err
 	}
@@ -91,7 +98,7 @@ type codeFile struct{}
 
 // Execute executes a test case and returns an error if occurred
 func (h *codeFile) Execute(filePath string) error {
-	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input")
+	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input", "-code")
 	if err != nil {
 		return err
 	}
@@ -102,7 +109,7 @@ type codeEnvVar struct{}
 
 // Execute executes a test case and returns an error if occurred
 func (h *codeEnvVar) Execute(filePath string) error {
-	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input", "-V", "baz=baz")
+	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input", "-V", "baz=baz", "-code")
 	if err != nil {
 		return err
 	}
@@ -113,7 +120,7 @@ type unsignedCode struct{}
 
 // Execute executes a test case and returns an error if occurred
 func (h *unsignedCode) Execute(filePath string) error {
-	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input")
+	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input", "-code")
 
 	// should error out
 	if err != nil {
@@ -128,7 +135,7 @@ type codePyNoSig struct{}
 
 // Execute executes a test case and returns an error if occurred
 func (h *codePyNoSig) Execute(filePath string) error {
-	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input")
+	results, err := testutils.RunNucleiArgsWithEnvAndGetResults(debug, getEnvValues(), "-t", filePath, "-u", "input", "-code")
 
 	// should error out
 	if err != nil {
