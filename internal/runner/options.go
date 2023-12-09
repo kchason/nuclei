@@ -3,6 +3,7 @@ package runner
 import (
 	"bufio"
 	"fmt"
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/sqlite"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -279,6 +280,12 @@ func createReportingOptions(options *types.Options) (*reporting.Options, error) 
 	if options.JSONLExport != "" {
 		reportingOptions.JSONLExporter = &jsonl.Options{
 			File:              options.JSONLExport,
+			IncludeRawPayload: !options.OmitRawRequests,
+		}
+	}
+	if options.SQLiteExport != "" {
+		reportingOptions.SQLiteExporter = &sqlite.Options{
+			File:              options.SQLiteExport,
 			IncludeRawPayload: !options.OmitRawRequests,
 		}
 	}

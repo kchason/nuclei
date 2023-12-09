@@ -20,7 +20,7 @@ type Info struct {
 	//   Multiple values can also be specified separated by commas.
 	// examples:
 	//   - value: "\"<username>\""
-	Authors stringslice.StringSlice `json:"author,omitempty" yaml:"author,omitempty" jsonschema:"title=author of the template,description=Author is the author of the template,example=username"`
+	Authors stringslice.StringSlice `json:"author,omitempty" yaml:"author,omitempty" gorm:"type:text" jsonschema:"title=author of the template,description=Author is the author of the template,example=username"`
 	// description: |
 	//   Any tags for the template.
 	//
@@ -29,7 +29,7 @@ type Info struct {
 	// examples:
 	//   - name: Example tags
 	//     value: "\"cve,cve2019,grafana,auth-bypass,dos\""
-	Tags stringslice.StringSlice `json:"tags,omitempty" yaml:"tags,omitempty" jsonschema:"title=tags of the template,description=Any tags for the template"`
+	Tags stringslice.StringSlice `json:"tags,omitempty" yaml:"tags,omitempty" gorm:"type:text" jsonschema:"title=tags of the template,description=Any tags for the template"`
 	// description: |
 	//   Description of the template.
 	//
@@ -56,7 +56,7 @@ type Info struct {
 	// examples:
 	//   - value: >
 	//       []string{"https://github.com/strapi/strapi", "https://github.com/getgrav/grav"}
-	Reference *stringslice.RawStringSlice `json:"reference,omitempty" yaml:"reference,omitempty" jsonschema:"title=references for the template,description=Links relevant to the template"`
+	Reference *stringslice.RawStringSlice `json:"reference,omitempty" yaml:"reference,omitempty" gorm:"type:text" jsonschema:"title=references for the template,description=Links relevant to the template"`
 	// description: |
 	//   Severity of the template.
 	SeverityHolder severity.Holder `json:"severity,omitempty" yaml:"severity,omitempty"`

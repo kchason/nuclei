@@ -63,15 +63,15 @@ func (exporter *Exporter) Close() error {
 	}
 
 	// Migrate the structure to conform with the output.ResultEvent struct
-	db.AutoMigrate(&output.ResultEvent{})
+	err = db.AutoMigrate(&output.ResultEvent{})
+	if err != nil {
+		return err
+	}
 
 	// Loop through and insert each record into the database
 	for _, row := range exporter.rows {
 		db.Create(&row)
 	}
-
-	// Close the connection to the file
-	db.Close()
 
 	return nil
 }
