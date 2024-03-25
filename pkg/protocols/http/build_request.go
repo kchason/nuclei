@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/corpix/uarand"
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/useragent"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/nuclei/v3/pkg/authprovider"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/contextargs"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/expressions"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/generators"
@@ -49,6 +50,32 @@ type generatedRequest struct {
 	customCancelFunction context.CancelFunc
 }
 
+// ApplyAuth applies the auth provider to the generated request
+func (g *generatedRequest) ApplyAuth(provider authprovider.AuthProvider) {
+	if provider == nil {
+		return
+	}
+	if g.request != nil {
+		auth := provider.LookupURLX(g.request.URL)
+		if auth != nil {
+			auth.ApplyOnRR(g.request)
+		}
+	}
+	if g.rawRequest != nil {
+		parsed, err := urlutil.ParseAbsoluteURL(g.rawRequest.FullURL, true)
+		if err != nil {
+			gologger.Warning().Msgf("[authprovider] Could not parse URL %s: %s\n", g.rawRequest.FullURL, err)
+			return
+		}
+		auth := provider.LookupURLX(parsed)
+		if auth != nil {
+			// here we need to apply it custom because we don't have a standard/official
+			// rawhttp request format ( which we probably should have )
+			g.rawRequest.ApplyAuthStrategy(auth)
+		}
+	}
+}
+
 func (g *generatedRequest) URL() string {
 	if g.request != nil {
 		return g.request.URL.String()
@@ -76,7 +103,10 @@ func (r *requestGenerator) Make(ctx context.Context, input *contextargs.Context,
 
 	// add template context values to dynamicValues (this takes care of self-contained and other types of requests)
 	// Note: `iterate-all` and flow are mutually exclusive. flow uses templateCtx and iterate-all uses dynamicValues
-	dynamicValues = generators.MergeMaps(dynamicValues, r.request.options.GetTemplateCtx(input.MetaInput).GetAll())
+	if r.request.options.HasTemplateCtx(input.MetaInput) {
+		// skip creating template context if not available
+		dynamicValues = generators.MergeMaps(dynamicValues, r.request.options.GetTemplateCtx(input.MetaInput).GetAll())
+	}
 	if r.request.SelfContained {
 		return r.makeSelfContainedRequest(ctx, reqData, payloads, dynamicValues)
 	}
@@ -94,7 +124,7 @@ func (r *requestGenerator) Make(ctx context.Context, input *contextargs.Context,
 	}
 
 	// Parse target url
-	parsed, err := urlutil.Parse(input.MetaInput.Input)
+	parsed, err := urlutil.ParseAbsoluteURL(input.MetaInput.Input, false)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +180,7 @@ func (r *requestGenerator) Make(ctx context.Context, input *contextargs.Context,
 		return r.generateRawRequest(ctx, reqData, parsed, finalVars, payloads)
 	}
 
-	reqURL, err := urlutil.ParseURL(reqData, true)
+	reqURL, err := urlutil.ParseAbsoluteURL(reqData, true)
 	if err != nil {
 		return nil, errorutil.NewWithTag("http", "failed to parse url %v while creating http request", reqData)
 	}
@@ -288,8 +318,7 @@ func (r *requestGenerator) generateRawRequest(ctx context.Context, rawRequest st
 		unsafeReq := &generatedRequest{rawRequest: rawRequestData, meta: generatorValues, original: r.request, interactshURLs: r.interactshURLs}
 		return unsafeReq, nil
 	}
-
-	urlx, err := urlutil.ParseURL(rawRequestData.FullURL, true)
+	urlx, err := urlutil.ParseAbsoluteURL(rawRequestData.FullURL, true)
 	if err != nil {
 		return nil, errorutil.NewWithErr(err).Msgf("failed to create request with url %v got %v", rawRequestData.FullURL, err).WithTag("raw")
 	}
@@ -378,7 +407,8 @@ func (r *requestGenerator) fillRequest(req *retryablehttp.Request, values map[st
 		req.Body = bodyReader
 	}
 	if !r.request.Unsafe {
-		httputil.SetHeader(req, "User-Agent", uarand.GetRandom())
+		userAgent := useragent.PickRandom()
+		httputil.SetHeader(req, "User-Agent", userAgent.Raw)
 	}
 
 	// Only set these headers on non-raw requests

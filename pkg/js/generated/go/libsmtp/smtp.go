@@ -15,16 +15,14 @@ func init() {
 	module.Set(
 		gojs.Objects{
 			// Functions
+			"NewSMTPClient": lib_smtp.NewSMTPClient,
 
 			// Var and consts
 
-			// Types (value type)
-			"IsSMTPResponse": func() lib_smtp.IsSMTPResponse { return lib_smtp.IsSMTPResponse{} },
-			"SMTPClient":     func() lib_smtp.SMTPClient { return lib_smtp.SMTPClient{} },
-
-			// Types (pointer type)
-			"NewIsSMTPResponse": func() *lib_smtp.IsSMTPResponse { return &lib_smtp.IsSMTPResponse{} },
-			"NewSMTPClient":     func() *lib_smtp.SMTPClient { return &lib_smtp.SMTPClient{} },
+			// Objects / Classes
+			"Client":       lib_smtp.NewSMTPClient,
+			"SMTPMessage":  gojs.GetClassConstructor[lib_smtp.SMTPMessage](&lib_smtp.SMTPMessage{}),
+			"SMTPResponse": gojs.GetClassConstructor[lib_smtp.SMTPResponse](&lib_smtp.SMTPResponse{}),
 		},
 	).Register()
 }

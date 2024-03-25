@@ -20,9 +20,7 @@
 <p align="center">
   <a href="#how-it-works">How</a> •
   <a href="#install-nuclei">Install</a> •
-  <a href="#for-security-engineers">For Security Engineers</a> •
-  <a href="#for-developers-and-organizations">For Developers</a> •
-  <a href="https://nuclei.projectdiscovery.io/nuclei/get-started/">Documentation</a> •
+  <a href="https://docs.projectdiscovery.io/tools/nuclei/">Documentation</a> •
   <a href="#credits">Credits</a> •
   <a href="https://nuclei.projectdiscovery.io/faq/nuclei/">FAQs</a> •
   <a href="https://discord.gg/projectdiscovery">Join Discord</a>
@@ -79,7 +77,7 @@ go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
   
 </details>
 
-**More installation [methods can be found here](https://nuclei.projectdiscovery.io/nuclei/get-started/).**
+**More installation [methods can be found here](https://docs.projectdiscovery.io/tools/nuclei/install).**
 
 <table>
 <tr>
@@ -89,7 +87,7 @@ go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 
 Nuclei has built-in support for automatic template download/update as default since version [v2.5.2](https://github.com/projectdiscovery/nuclei/releases/tag/v2.5.2). [**Nuclei-Templates**](https://github.com/projectdiscovery/nuclei-templates) project provides a community-contributed list of ready-to-use templates that is constantly updated.
 
-You may still use the `update-templates` flag to update the nuclei templates at any time; You can write your own checks for your individual workflow and needs following Nuclei's [templating guide](https://nuclei.projectdiscovery.io/templating-guide/).
+You may still use the `update-templates` flag to update the nuclei templates at any time; You can write your own checks for your individual workflow and needs following Nuclei's [templating guide](https://docs.projectdiscovery.io/templates/).
 
 The YAML DSL reference syntax is available [here](SYNTAX-REFERENCE.md).
 
@@ -115,12 +113,17 @@ Usage:
 
 Flags:
 TARGET:
-   -u, -target string[]             target URLs/hosts to scan
-   -l, -list string                 path to file containing a list of target URLs/hosts to scan (one per line)
-   -eh, -exclude-hosts string[]     hosts to exclude to scan from the input list (ip, cidr, hostname)
-   -resume string                   resume scan using resume.cfg (clustering will be disabled)
-   -sa, -scan-all-ips               scan all the IP's associated with dns record
-   -iv, -ip-version string[]        IP version to scan of hostname (4,6) - (default 4)
+   -u, -target string[]          target URLs/hosts to scan
+   -l, -list string              path to file containing a list of target URLs/hosts to scan (one per line)
+   -eh, -exclude-hosts string[]  hosts to exclude to scan from the input list (ip, cidr, hostname)
+   -resume string                resume scan using resume.cfg (clustering will be disabled)
+   -sa, -scan-all-ips            scan all the IP's associated with dns record
+   -iv, -ip-version string[]     IP version to scan of hostname (4,6) - (default 4)
+
+TARGET-FORMAT:
+   -im, -input-mode string        mode of input file (list, burp, jsonl, yaml, openapi, swagger) (default "list")
+   -ro, -required-only            use only required fields in input format when generating requests
+   -sfv, -skip-format-validation  skip format validation (like missing vars) when parsing input file
 
 TEMPLATES:
    -nt, -new-templates                    run only new templates added in latest nuclei-templates release
@@ -136,6 +139,7 @@ TEMPLATES:
    -tl                                    list all available templates
    -sign                                  signs the templates with the private key defined in NUCLEI_SIGNATURE_PRIVATE_KEY env variable
    -code                                  enable loading code protocol-based templates
+   -dut, -disable-unsigned-templates      disable running unsigned templates or templates with mismatched signature
 
 FILTERING:
    -a, -author string[]               templates to run based on authors (comma-separated, file)
@@ -144,8 +148,8 @@ FILTERING:
    -itags, -include-tags string[]     tags to be executed even if they are excluded either by default or configuration
    -id, -template-id string[]         templates to run based on template ids (comma-separated, file, allow-wildcard)
    -eid, -exclude-id string[]         templates to exclude based on template ids (comma-separated, file)
-   -it, -include-templates string[]   templates to be executed even if they are excluded either by default or configuration
-   -et, -exclude-templates string[]   template or template directory to exclude (comma-separated, file)
+   -it, -include-templates string[]   path to template file or directory to be executed even if they are excluded either by default or configuration
+   -et, -exclude-templates string[]   path to template file or directory to exclude (comma-separated, file)
    -em, -exclude-matchers string[]    template matchers to exclude in result
    -s, -severity value[]              templates to run based on severity. Possible values: info, low, medium, high, critical, unknown
    -es, -exclude-severity value[]     templates to exclude based on severity. Possible values: info, low, medium, high, critical, unknown
@@ -217,6 +221,7 @@ INTERACTSH:
 FUZZING:
    -ft, -fuzzing-type string  overrides fuzzing type set in template (replace, prefix, postfix, infix)
    -fm, -fuzzing-mode string  overrides fuzzing mode set in template (multiple, single)
+   -fuzz                      enable loading fuzzing templates
 
 UNCOVER:
    -uc, -uncover                  enable uncover engine
@@ -233,6 +238,8 @@ RATE-LIMIT:
    -c, -concurrency int               maximum number of templates to be executed in parallel (default 25)
    -hbs, -headless-bulk-size int      maximum number of headless hosts to be analyzed in parallel per template (default 10)
    -headc, -headless-concurrency int  maximum number of headless templates to be executed in parallel (default 10)
+   -jsc, -js-concurrency int          maximum number of javascript runtimes to be executed in parallel (default 120)
+   -pc, -payload-concurrency int      max payload concurrency for each template (default 25)
 
 OPTIMIZATIONS:
    -timeout int                     time to wait in seconds before timeout (default 10)
@@ -290,119 +297,37 @@ STATISTICS:
    -mp, -metrics-port int    port to expose nuclei metrics on (default 9092)
 
 CLOUD:
-   -auth                configure projectdiscovery cloud (pdcp) api key
-   -cup, -cloud-upload  upload scan results to pdcp dashboard
+   -auth                  configure projectdiscovery cloud (pdcp) api key
+   -cup, -cloud-upload    upload scan results to pdcp dashboard
+   -sid, -scan-id string  upload scan results to given scan id
+
+AUTHENTICATION:
+   -sf, -secret-file string[]  path to config file containing secrets for nuclei authenticated scan
+   -ps, -prefetch-secrets      prefetch secrets from the secrets file
 
 
 EXAMPLES:
 Run nuclei on single host:
-	$ nuclei -target example.com
+   $ nuclei -target example.com
 
 Run nuclei with specific template directories:
-	$ nuclei -target example.com -t http/cves/ -t ssl
+   $ nuclei -target example.com -t http/cves/ -t ssl
 
 Run nuclei against a list of hosts:
-	$ nuclei -list hosts.txt
+   $ nuclei -list hosts.txt
 
 Run nuclei with a JSON output:
-	$ nuclei -target example.com -json-export output.json
+   $ nuclei -target example.com -json-export output.json
 
 Run nuclei with sorted Markdown outputs (with environment variables):
-	$ MARKDOWN_EXPORT_SORT_MODE=template nuclei -target example.com -markdown-export nuclei_report/
+   $ MARKDOWN_EXPORT_SORT_MODE=template nuclei -target example.com -markdown-export nuclei_report/
 
 Additional documentation is available at: https://docs.nuclei.sh/getting-started/running
 ```
 
 ### Running Nuclei
 
-Scanning target domain with [community-curated](https://github.com/projectdiscovery/nuclei-templates) nuclei templates.
-
-```sh
-nuclei -u https://example.com
-```
-
-Scanning target URLs with [community-curated](https://github.com/projectdiscovery/nuclei-templates) nuclei templates.
-
-```sh
-nuclei -list urls.txt
-```
-
-Example of `urls.txt`:
-
-```yaml
-http://example.com
-http://app.example.com
-http://test.example.com
-http://uat.example.com
-```
-
-**More detailed examples of running nuclei can be found [here](https://nuclei.projectdiscovery.io/nuclei/get-started/#running-nuclei).**
-
-# For Security Engineers
-
-Nuclei offers great number of features that are helpful for security engineers to customise workflow in their organization. With the varieties of scan capabilities (like DNS, HTTP, TCP), security engineers can easily create their suite of custom checks with Nuclei.
-
-- Varieties of protocols supported: TCP, DNS, HTTP, File, etc
-- Achieve complex vulnerability steps with workflows and [dynamic requests.](https://blog.projectdiscovery.io/nuclei-unleashed-quickly-write-complex-exploits/)
-- Easy to integrate into CI/CD, designed to be easily integrated into regression cycle to actively check the fix and re-appearance of vulnerability. 
-
-<h1 align="left">
-  <a href="https://nuclei.projectdiscovery.io/nuclei/get-started/"><img src="static/learn-more-button.png" width="170px" alt="Learn More"></a>
-</h1>
-
-<table>
-<tr>
-<td>  
-
-**For Bug Bounty hunters:**
-
-Nuclei allows you to customise your testing approach with your own suite of checks and easily run across your bug bounty programs. Moreover, Nuclei can be easily integrated into any continuous scanning workflow.
-
-- Designed to be easily integrated into other tool workflow.
-- Can process thousands of hosts in few minutes.
-- Easily automate your custom testing approach with our simple YAML DSL.
-
-Please check our other open-source projects that might fit into your bug bounty workflow: [github.com/projectdiscovery](http://github.com/projectdiscovery), we also host daily [refresh of DNS data at Chaos](http://chaos.projectdiscovery.io).
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td>
-  
-**For Penetration Testers:**
-
-Nuclei immensely improve how you approach security assessment by augmenting the manual, repetitive processes. Consultancies are already converting their manual assessment steps with Nuclei, it allows them to run set of their custom assessment approach across thousands of hosts in an automated manner. 
-
-Pen-testers get the full power of our public templates and customization capabilities to speed up their assessment process, and specifically with the regression cycle where you can easily verify the fix.
-
-- Easily create your compliance, standards suite (e.g. OWASP Top 10) checklist.
-- With capabilities like [fuzz](https://nuclei.projectdiscovery.io/templating-guide/protocols/http-fuzzing/) and [workflows](https://nuclei.projectdiscovery.io/templating-guide/workflows/), complex manual steps and repetitive assessment can be easily automated with Nuclei.
-- Easy to re-test vulnerability-fix by just re-running the template.
-
-</td>
-</tr>
-</table>
-
-
-# For Developers and Organizations
-
-Nuclei is built with simplicity in mind, with the community backed templates by hundreds of security researchers, it allows you to stay updated with the latest security threats using continuous Nuclei scanning on the hosts. It is designed to be easily integrated into regression tests cycle, to verify the fixes and eliminate vulnerabilities from occurring in the future.
-
-- **CI/CD:** Engineers are already utilising Nuclei within their CI/CD pipeline, it allows them to constantly monitor their staging and production environments with customised templates.
-- **Continuous Regression Cycle:** With Nuclei, you can create your custom template on every new identified vulnerability and put into Nuclei engine to eliminate in the continuous regression cycle.
-
-We have [a discussion thread around this](https://github.com/projectdiscovery/nuclei-templates/discussions/693), there are already some bug bounty programs giving incentives to hackers on writing nuclei templates with every submission, that helps them to eliminate the vulnerability across all their assets, as well as to eliminate future risk in reappearing on productions. If you're interested in implementing it in your organization, feel free to [reach out to us](mailto:contact@projectdiscovery.io). We will be more than happy to help you in the getting started process, or you can also post into the [discussion thread for any help](https://github.com/projectdiscovery/nuclei-templates/discussions/693).
-
-<h3 align="center">
-  <img src="static/regression-with-nuclei.jpg" alt="regression-cycle-with-nuclei" width="1100px"></a>
-</h3>
-
-<h1 align="left">
-  <a href="https://github.com/projectdiscovery/nuclei-action"><img src="static/learn-more-button.png" width="170px" alt="Learn More"></a>
-</h1>
+See https://docs.projectdiscovery.io/tools/nuclei/running for details on running Nuclei
 
 ### Using Nuclei From Go Code
 
@@ -411,17 +336,9 @@ Complete guide of using Nuclei as Library/SDK is available at [godoc](https://pk
 
 ### Resources
 
-- [Finding bugs with Nuclei with PinkDraconian (Robbe Van Roey)](https://www.youtube.com/watch?v=ewP0xVPW-Pk) by **[@PinkDraconian](https://twitter.com/PinkDraconian)** 
-- [Nuclei: Packing a Punch with Vulnerability Scanning](https://bishopfox.com/blog/nuclei-vulnerability-scan) by **Bishopfox**
-- [The WAF efficacy framework](https://www.fastly.com/blog/the-waf-efficacy-framework-measuring-the-effectiveness-of-your-waf) by **Fastly**
-- [Scanning Live Web Applications with Nuclei in CI/CD Pipeline](https://blog.escape.tech/devsecops-part-iii-scanning-live-web-applications/) by **[@TristanKalos](https://twitter.com/TristanKalos)**
-- [Community Powered Scanning with Nuclei](https://blog.projectdiscovery.io/community-powered-scanning-with-nuclei/)
-- [Nuclei Unleashed - Quickly write complex exploits](https://blog.projectdiscovery.io/nuclei-unleashed-quickly-write-complex-exploits/)
-- [Nuclei - Fuzz all the things](https://blog.projectdiscovery.io/nuclei-fuzz-all-the-things/)
-- [Nuclei + Interactsh Integration for Automating OOB Testing](https://blog.projectdiscovery.io/nuclei-interactsh-integration/)
-- [Weaponizes nuclei Workflows to Pwn All the Things](https://medium.com/@dwisiswant0/weaponizes-nuclei-workflows-to-pwn-all-the-things-cd01223feb77) by **[@dwisiswant0](https://github.com/dwisiswant0)**
-- [How to Scan Continuously with Nuclei?](https://medium.com/@dwisiswant0/how-to-scan-continuously-with-nuclei-fcb7e9d8b8b9) by **[@dwisiswant0](https://github.com/dwisiswant0)**
-- [Hack with Automation !!!](https://dhiyaneshgeek.github.io/web/security/2021/07/19/hack-with-automation/) by **[@DhiyaneshGeek](https://github.com/DhiyaneshGeek)**
+You can access the main documentation for Nuclei at https://docs.projectdiscovery.io/tools/nuclei/, and learn more about Nuclei in the cloud with [ProjectDiscovery Cloud Platform](https://cloud.projectdiscovery.io)
+
+See https://docs.projectdiscovery.io/tools/nuclei/resources for more resources and videos about Nuclei!
 
 ### Credits
 
@@ -445,5 +362,5 @@ Do also check out the below similar open-source projects that may fit in your wo
 Nuclei is distributed under [MIT License](https://github.com/projectdiscovery/nuclei/blob/main/LICENSE.md)
 
 <h1 align="left">
-  <a href="https://discord.gg/projectdiscovery"><img src="static/Join-Discord.png" width="380" alt="Join Discord"></a> <a href="https://nuclei.projectdiscovery.io"><img src="static/check-nuclei-documentation.png" width="380" alt="Check Nuclei Documentation"></a>
+  <a href="https://discord.gg/projectdiscovery"><img src="static/Join-Discord.png" width="380" alt="Join Discord"></a> <a href="https://docs.projectdiscovery.io"><img src="static/check-nuclei-documentation.png" width="380" alt="Check Nuclei Documentation"></a>
 </h1>
