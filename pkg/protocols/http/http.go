@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/invopop/jsonschema"
 	json "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 
@@ -19,6 +20,7 @@ import (
 	httputil "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils/http"
 	"github.com/projectdiscovery/rawhttp"
 	"github.com/projectdiscovery/retryablehttp-go"
+	"github.com/projectdiscovery/utils/env"
 	fileutil "github.com/projectdiscovery/utils/file"
 )
 
@@ -211,13 +213,35 @@ type Request struct {
 	//  DisablePathAutomerge disables merging target url path with raw request path
 	DisablePathAutomerge bool `yaml:"disable-path-automerge,omitempty" json:"disable-path-automerge,omitempty" jsonschema:"title=disable auto merging of path,description=Disable merging target url path with raw request path"`
 	// description: |
-	//   Filter is matcher-like field to check if fuzzing should be performed on this request or not
-	FuzzingFilter []*matchers.Matcher `yaml:"filters,omitempty" json:"filter,omitempty" jsonschema:"title=filter for fuzzing,description=Filter is matcher-like field to check if fuzzing should be performed on this request or not"`
+	//   Fuzz PreCondition is matcher-like field to check if fuzzing should be performed on this request or not
+	FuzzPreCondition []*matchers.Matcher `yaml:"pre-condition,omitempty" json:"pre-condition,omitempty" jsonschema:"title=pre-condition for fuzzing/dast,description=PreCondition is matcher-like field to check if fuzzing should be performed on this request or not"`
 	// description: |
-	//   Filter condition is the condition to apply on the filter (AND/OR). Default is OR
-	FuzzingFilterCondition string `yaml:"filters-condition,omitempty" json:"filter-condition,omitempty" jsonschema:"title=condition between the filters,description=Conditions between the filters,enum=and,enum=or"`
-	// cached variables that may be used along with request.
-	fuzzingFilterCondition matchers.ConditionType `yaml:"-" json:"-"`
+	//  FuzzPreConditionOperator is the operator between multiple PreConditions for fuzzing Default is OR
+	FuzzPreConditionOperator string                 `yaml:"pre-condition-operator,omitempty" json:"pre-condition-operator,omitempty" jsonschema:"title=condition between the filters,description=Operator to use between multiple per-conditions,enum=and,enum=or"`
+	fuzzPreConditionOperator matchers.ConditionType `yaml:"-" json:"-"`
+}
+
+func (e Request) JSONSchemaExtend(schema *jsonschema.Schema) {
+	headersSchema, ok := schema.Properties.Get("headers")
+	if !ok {
+		return
+	}
+	headersSchema.PatternProperties = map[string]*jsonschema.Schema{
+		".*": {
+			OneOf: []*jsonschema.Schema{
+				{
+					Type: "string",
+				},
+				{
+					Type: "integer",
+				},
+				{
+					Type: "boolean",
+				},
+			},
+		},
+	}
+	headersSchema.Ref = ""
 }
 
 // Options returns executer options for http request
@@ -326,13 +350,13 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 
 	// === fuzzing filters ===== //
 
-	if request.FuzzingFilterCondition != "" {
-		request.fuzzingFilterCondition = matchers.ConditionTypes[request.FuzzingFilterCondition]
+	if request.FuzzPreConditionOperator != "" {
+		request.fuzzPreConditionOperator = matchers.ConditionTypes[request.FuzzPreConditionOperator]
 	} else {
-		request.fuzzingFilterCondition = matchers.ORCondition
+		request.fuzzPreConditionOperator = matchers.ORCondition
 	}
 
-	for _, filter := range request.FuzzingFilter {
+	for _, filter := range request.FuzzPreCondition {
 		if err := filter.CompileMatchers(); err != nil {
 			return errors.Wrap(err, "could not compile matcher")
 		}
@@ -417,7 +441,11 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 			request.Threads = protocolstate.GuardThreadsOrDefault(request.Threads)
 		}
 		// if we have payloads, adjust threads if none specified
-		request.Threads = options.GetThreadsForNPayloadRequests(request.Requests(), request.Threads)
+		// We only do this in case we have more payload requests than the
+		// specified concurrency threshold.
+		if request.generator.NewIterator().Total() > PayloadAutoConcurrencyThreshold {
+			request.Threads = options.GetThreadsForNPayloadRequests(request.Requests(), request.Threads)
+		}
 	}
 
 	return nil
@@ -443,4 +471,12 @@ func (request *Request) Requests() int {
 		return requests
 	}
 	return len(request.Path)
+}
+
+// PayloadAutoConcurrencyThreshold is the threshold for auto adjusting concurrency
+// for payloads in a template.
+var PayloadAutoConcurrencyThreshold int
+
+func init() {
+	PayloadAutoConcurrencyThreshold = env.GetEnvOrDefault[int]("NUCLEI_PAYLOAD_AUTO_CONCURRENCY_THRESHOLD", 100)
 }
