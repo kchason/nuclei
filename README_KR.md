@@ -250,6 +250,7 @@ DEBUG:
    -ep, -enable-pprof        pprof 디버깅 서버 활성화
    -tv, -templates-version   설치된 nuclei-templates의 버전 표시
    -hc, -health-check        진단 검사 실행
+   -tech, -tech-detect
 
 UPDATE:
    -up, -update                      최신 릴리스 버전으로 nuclei 엔진 업데이트

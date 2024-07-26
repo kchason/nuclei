@@ -18,8 +18,11 @@ type Exporter struct {
 // Options contains the configuration options for JSON exporter client
 type Options struct {
 	// File is the file to export found JSON result to
-	File    string `yaml:"file"`
-	OmitRaw bool   `yaml:"omit-raw"`
+	File string `yaml:"file"`
+	// OmitRaw specifies whether to omit raw requests and responses
+	OmitRaw bool `yaml:"omit-raw"`
+	// DetectedTechs is a list of detected technologies from the automatic scan (-as)
+	DetectedTechs []string `yaml:"detected-techs"`
 }
 
 // New creates a new JSON exporter integration client based on options.

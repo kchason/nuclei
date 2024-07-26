@@ -59,12 +59,12 @@ type Exporter interface {
 
 // ReportingClient is a client for nuclei issue tracking module
 type ReportingClient struct {
-	trackers  []Tracker
-	exporters []Exporter
-	options   *Options
-	dedupe    *dedupe.Storage
-
-	stats map[string]*IssueTrackerStats
+	trackers     []Tracker
+	exporters    []Exporter
+	options      *Options
+	dedupe       *dedupe.Storage
+	detectedTech []string
+	stats        map[string]*IssueTrackerStats
 }
 
 type IssueTrackerStats struct {

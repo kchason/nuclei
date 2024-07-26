@@ -283,6 +283,7 @@ DEBUG:
    -ep, -enable-pprof        enable pprof debugging server
    -tv, -templates-version   shows the version of the installed nuclei-templates
    -hc, -health-check        run diagnostic check up
+   -tech, -tech-detect       output the identified technologies from the tech-detect templates 
 
 UPDATE:
    -up, -update                      update nuclei engine to the latest released version

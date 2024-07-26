@@ -288,6 +288,8 @@ type Options struct {
 	ResponseSaveSize int
 	// Health Check
 	HealthCheck bool
+	// TechDetect determines whether to print the tech detected for a host
+	TechDetect bool
 	// Time to wait between each input read operation before closing the stream
 	InputReadTimeout time.Duration
 	// Disable stdin for input processing

@@ -280,6 +280,8 @@ UNCOVER引擎:
     -ep, -enable-pprof                   启用pprof调试服务器
     -tv, -templates-version              显示已安装的模板版本
     -hc, -health-check                   运行诊断检查
+    -tech, -tech-detect
+
 
 升级：
     -up, -update                         更新Nuclei到最新版本

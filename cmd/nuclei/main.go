@@ -383,6 +383,7 @@ on extensive configurability, massive extensibility and ease of use.`)
 		flagSet.BoolVarP(&options.EnablePprof, "enable-pprof", "ep", false, "enable pprof debugging server"),
 		flagSet.CallbackVarP(printTemplateVersion, "templates-version", "tv", "shows the version of the installed nuclei-templates"),
 		flagSet.BoolVarP(&options.HealthCheck, "health-check", "hc", false, "run diagnostic check up"),
+		flagSet.BoolVarP(&options.TechDetect, "tech-detect", "tech", false, "output the identified technologies from the tech-detect templates"),
 	)
 
 	flagSet.CreateGroup("update", "Update",

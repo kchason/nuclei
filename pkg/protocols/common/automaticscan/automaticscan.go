@@ -88,7 +88,7 @@ func New(opts Options) (*Service, error) {
 		return nil, err
 	}
 
-	// load tech detect templates
+	// load tech-detect templates
 	techDetectTemplates, err := LoadTemplatesWithTags(opts, templateDirs, []string{"tech", "detect", "favicon"}, true)
 	if err != nil {
 		return nil, err
@@ -173,6 +173,12 @@ func (s *Service) executeAutomaticScanOnTarget(input *contextargs.MetaInput) {
 	}
 	if s.opts.Options.VerboseVerbose {
 		gologger.Print().Msgf("Final tags identified for %v: %+v\n", input.Input, finalTags)
+	}
+	if s.opts.Options.TechDetect {
+		// Log the detected technologies
+		gologger.Info().Msgf("Detected: %v technologies on host: %v\n", finalTags, input.Input)
+		// Add to the result so that it is output in the markdown, JSON, etc.
+		//s.opts.IssuesClient.detectedTech = finalTags
 	}
 
 	finalTemplates, err := LoadTemplatesWithTags(s.ServiceOpts, s.templateDirs, finalTags, false)
