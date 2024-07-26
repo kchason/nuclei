@@ -2,7 +2,10 @@ package customtemplates
 
 import (
 	"context"
+	"github.com/jferrl/go-githubauth"
+	"io"
 	httpclient "net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -196,4 +199,39 @@ func getGHClientWithToken(token string) *github.Client {
 func getGHClientIncognito() *github.Client {
 	var tc *httpclient.Client
 	return github.NewClient(tc)
+}
+
+// getGHClientWithAppCertPath creates a GitHub client using the app cert and installation ID.
+// It reads the private key from the given path then creates the client, effectively serving as a wrapper around getGHClientWithAppCert
+func getGHClientWithAppCertPath(appID int64, installationID int64, privateKeyPath string) *github.Client {
+	// Open the file
+	file, err := os.Open(privateKeyPath)
+	if err != nil {
+		gologger.Fatal().Msgf("Failed to open file: %s", err)
+		return nil
+	}
+	defer file.Close()
+
+	// Read in the private key as a []byte array
+	privateKey, err := io.ReadAll(file)
+	if err != nil {
+		gologger.Fatal().Msgf("Error reading private key: %s", err)
+		return nil
+	}
+
+	// Create the GitHub client with the app cert
+	return getGHClientWithAppCert(appID, installationID, privateKey)
+}
+
+// getGHClientWithAppCert creates a GitHub client using the app cert and installation ID
+func getGHClientWithAppCert(appID int64, installationID int64, privateKey []byte) *github.Client {
+	appTokenSource, err := githubauth.NewApplicationTokenSource(appID, privateKey)
+	if err != nil {
+		gologger.Fatal().Msgf("Error creating application token source: %s", err)
+		return nil
+	}
+
+	installationTokenSource := githubauth.NewInstallationTokenSource(installationID, appTokenSource)
+	httpClient := oauth2.NewClient(context.Background(), installationTokenSource)
+	return github.NewClient(httpClient)
 }
