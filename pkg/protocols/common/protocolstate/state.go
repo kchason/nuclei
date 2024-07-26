@@ -22,6 +22,10 @@ var (
 	Dialer *fastdialer.Dialer
 )
 
+func ShouldInit() bool {
+	return Dialer == nil
+}
+
 // Init creates the Dialer instance based on user configuration
 func Init(options *types.Options) error {
 	if Dialer != nil {
@@ -30,9 +34,7 @@ func Init(options *types.Options) error {
 
 	lfaAllowed = options.AllowLocalFileAccess
 	opts := fastdialer.DefaultOptions
-	if options.DialerTimeout > 0 {
-		opts.DialerTimeout = options.DialerTimeout
-	}
+	opts.DialerTimeout = options.GetTimeouts().DialTimeout
 	if options.DialerKeepAlive > 0 {
 		opts.DialerKeepAlive = options.DialerKeepAlive
 	}
@@ -124,7 +126,7 @@ func Init(options *types.Options) error {
 		opts.ResolversFile = true
 		opts.EnableFallback = true
 	}
-	if options.ResolversFile != "" {
+	if len(options.InternalResolversList) > 0 {
 		opts.BaseResolvers = options.InternalResolversList
 	}
 
@@ -132,6 +134,9 @@ func Init(options *types.Options) error {
 
 	opts.WithDialerHistory = true
 	opts.SNIName = options.SNI
+	// this instance is used in javascript protocol libraries and
+	// dial history is required to get dialed ip of a host
+	opts.WithDialerHistory = true
 
 	// fastdialer now by default fallbacks to ztls when there are tls related errors
 	dialer, err := fastdialer.NewDialer(opts)
@@ -145,7 +150,7 @@ func Init(options *types.Options) error {
 		return Dialer.Dial(ctx, "tcp", addr)
 	})
 
-	StartActiveMemGuardian()
+	StartActiveMemGuardian(context.Background())
 
 	return nil
 }
@@ -177,6 +182,7 @@ func interfaceAddress(interfaceName string) (net.IP, error) {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				address = ipnet.IP
+				break
 			}
 		}
 	}
@@ -206,6 +212,8 @@ func interfaceAddresses(interfaceName string) ([]net.Addr, error) {
 func Close() {
 	if Dialer != nil {
 		Dialer.Close()
+		Dialer = nil
 	}
+	Dialer = nil
 	StopActiveMemGuardian()
 }

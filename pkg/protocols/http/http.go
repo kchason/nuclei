@@ -18,9 +18,9 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/http/httpclientpool"
 	httputil "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils/http"
+	"github.com/projectdiscovery/nuclei/v3/pkg/utils/stats"
 	"github.com/projectdiscovery/rawhttp"
 	"github.com/projectdiscovery/retryablehttp-go"
-	"github.com/projectdiscovery/utils/env"
 	fileutil "github.com/projectdiscovery/utils/file"
 )
 
@@ -336,7 +336,7 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 				request.Raw[i] = strings.ReplaceAll(raw, "\n", "\r\n")
 			}
 		}
-		request.rawhttpClient = httpclientpool.GetRawHTTP(options.Options)
+		request.rawhttpClient = httpclientpool.GetRawHTTP(options)
 	}
 	if len(request.Matchers) > 0 || len(request.Extractors) > 0 {
 		compiled := &request.Operators
@@ -436,14 +436,32 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 		}
 	}
 	if len(request.Payloads) > 0 {
-		// specifically for http requests high concurrency and and threads will lead to memory exausthion, hence reduce the maximum parallelism
-		if protocolstate.IsLowOnMemory() {
-			request.Threads = protocolstate.GuardThreadsOrDefault(request.Threads)
+		// Due to a known issue (https://github.com/projectdiscovery/nuclei/issues/5015),
+		// dynamic extractors cannot be used with payloads. To address this,
+		// execution is handled by the standard engine without concurrency,
+		// achieved by setting the thread count to 0.
+
+		// this limitation will be removed once we have a better way to handle dynamic extractors with payloads
+		hasMultipleRequests := false
+		if len(request.Raw)+len(request.Path) > 1 {
+			hasMultipleRequests = true
 		}
-		// if we have payloads, adjust threads if none specified
-		// We only do this in case we have more payload requests than the
-		// specified concurrency threshold.
-		if request.generator.NewIterator().Total() > PayloadAutoConcurrencyThreshold {
+		// look for dynamic extractor ( internal: true with named extractor)
+		hasNamedInternalExtractor := false
+		for _, extractor := range request.Extractors {
+			if extractor.Internal && extractor.Name != "" {
+				hasNamedInternalExtractor = true
+				break
+			}
+		}
+		if hasNamedInternalExtractor && hasMultipleRequests {
+			stats.Increment(SetThreadToCountZero)
+			request.Threads = 0
+		} else {
+			// specifically for http requests high concurrency and and threads will lead to memory exausthion, hence reduce the maximum parallelism
+			if protocolstate.IsLowOnMemory() {
+				request.Threads = protocolstate.GuardThreadsOrDefault(request.Threads)
+			}
 			request.Threads = options.GetThreadsForNPayloadRequests(request.Requests(), request.Threads)
 		}
 	}
@@ -473,10 +491,10 @@ func (request *Request) Requests() int {
 	return len(request.Path)
 }
 
-// PayloadAutoConcurrencyThreshold is the threshold for auto adjusting concurrency
-// for payloads in a template.
-var PayloadAutoConcurrencyThreshold int
+const (
+	SetThreadToCountZero = "set-thread-count-to-zero"
+)
 
 func init() {
-	PayloadAutoConcurrencyThreshold = env.GetEnvOrDefault[int]("NUCLEI_PAYLOAD_AUTO_CONCURRENCY_THRESHOLD", 100)
+	stats.NewEntry(SetThreadToCountZero, "Setting thread count to 0 for %d templates, dynamic extractors are not supported with payloads yet")
 }

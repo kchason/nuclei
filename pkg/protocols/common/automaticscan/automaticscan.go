@@ -1,6 +1,7 @@
 package automaticscan
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -30,14 +31,15 @@ import (
 	mapsutil "github.com/projectdiscovery/utils/maps"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 	stringsutil "github.com/projectdiscovery/utils/strings"
+	syncutil "github.com/projectdiscovery/utils/sync"
+	unitutils "github.com/projectdiscovery/utils/unit"
 	wappalyzer "github.com/projectdiscovery/wappalyzergo"
-	"github.com/remeh/sizedwaitgroup"
 	"gopkg.in/yaml.v2"
 )
 
 const (
 	mappingFilename = "wappalyzer-mapping.yml"
-	maxDefaultBody  = 4 * 1024 * 1024 // 4MB
+	maxDefaultBody  = 4 * unitutils.Mega
 )
 
 // Options contains configuration options for automatic scan service
@@ -55,7 +57,6 @@ type Service struct {
 	engine             *core.Engine
 	target             provider.InputProvider
 	wappalyzer         *wappalyzer.Wappalyze
-	childExecuter      *core.ChildExecuter
 	httpclient         *retryablehttp.Client
 	templateDirs       []string // root Template Directories
 	technologyMappings map[string]string
@@ -94,7 +95,6 @@ func New(opts Options) (*Service, error) {
 		return nil, err
 	}
 
-	childExecuter := opts.Engine.ChildExecuter()
 	httpclient, err := httpclientpool.Get(opts.ExecuterOpts.Options, &httpclientpool.Configuration{
 		Connection: &httpclientpool.ConnectionConfiguration{
 			DisableKeepAlive: httputil.ShouldDisableKeepAlive(opts.ExecuterOpts.Options),
@@ -110,7 +110,6 @@ func New(opts Options) (*Service, error) {
 		target:             opts.Target,
 		wappalyzer:         wappalyzer,
 		templateDirs:       templateDirs, // fix this
-		childExecuter:      childExecuter,
 		httpclient:         httpclient,
 		technologyMappings: mappingData,
 		techTemplates:      techDetectTemplates,
@@ -128,7 +127,10 @@ func (s *Service) Close() bool {
 func (s *Service) Execute() error {
 	gologger.Info().Msgf("Executing Automatic scan on %d target[s]", s.target.Count())
 	// setup host concurrency
-	sg := sizedwaitgroup.New(s.opts.Options.BulkSize)
+	sg, err := syncutil.New(syncutil.WithSize(s.opts.Options.BulkSize))
+	if err != nil {
+		return err
+	}
 	s.target.Iterate(func(value *contextargs.MetaInput) bool {
 		sg.Add()
 		go func(input *contextargs.MetaInput) {
@@ -186,7 +188,7 @@ func (s *Service) executeAutomaticScanOnTarget(input *contextargs.MetaInput) {
 	execOptions.Progress = &testutils.MockProgressClient{} // stats are not supported yet due to centralized logic and cannot be reinitialized
 	eng.SetExecuterOptions(execOptions)
 
-	tmp := eng.ExecuteScanWithOpts(finalTemplates, provider.NewSimpleInputProviderWithUrls(input.Input), true)
+	tmp := eng.ExecuteScanWithOpts(context.Background(), finalTemplates, provider.NewSimpleInputProviderWithUrls(input.Input), true)
 	s.hasResults.Store(tmp.Load())
 }
 
@@ -241,19 +243,21 @@ func (s *Service) getTagsUsingWappalyzer(input *contextargs.MetaInput) []string 
 
 // getTagsUsingDetectionTemplates returns tags using detection templates
 func (s *Service) getTagsUsingDetectionTemplates(input *contextargs.MetaInput) ([]string, int) {
-	ctxArgs := contextargs.NewWithInput(input.Input)
+	ctx := context.Background()
+
+	ctxArgs := contextargs.NewWithInput(ctx, input.Input)
 
 	// execute tech detection templates on target
 	tags := map[string]struct{}{}
 	m := &sync.Mutex{}
-	sg := sizedwaitgroup.New(s.opts.Options.TemplateThreads)
+	sg, _ := syncutil.New(syncutil.WithSize(s.opts.Options.TemplateThreads))
 	counter := atomic.Uint32{}
 
 	for _, t := range s.techTemplates {
 		sg.Add()
 		go func(template *templates.Template) {
 			defer sg.Done()
-			ctx := scan.NewScanContext(ctxArgs)
+			ctx := scan.NewScanContext(ctx, ctxArgs)
 			ctx.OnResult = func(event *output.InternalWrappedEvent) {
 				if event == nil {
 					return

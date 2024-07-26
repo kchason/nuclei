@@ -27,13 +27,16 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/generators"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/helpers/eventcreator"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/interactsh"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/utils/vardump"
 	protocolutils "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils"
 	templateTypes "github.com/projectdiscovery/nuclei/v3/pkg/templates/types"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
+	"github.com/projectdiscovery/utils/errkit"
 	errorutil "github.com/projectdiscovery/utils/errors"
+	iputil "github.com/projectdiscovery/utils/ip"
+	syncutil "github.com/projectdiscovery/utils/sync"
 	urlutil "github.com/projectdiscovery/utils/url"
-	"github.com/remeh/sizedwaitgroup"
 )
 
 // Request is a request for the javascript protocol
@@ -61,9 +64,6 @@ type Request struct {
 	// description: |
 	//   Code contains code to execute for the javascript request.
 	Code string `yaml:"code,omitempty" json:"code,omitempty" jsonschema:"title=code to execute in javascript,description=Executes inline javascript code for the request"`
-	// description: |
-	//   Timeout in seconds is optional timeout for each  javascript script execution (i.e init, pre-condition, code)
-	Timeout int `yaml:"timeout,omitempty" json:"timeout,omitempty" jsonschema:"title=timeout for javascript execution,description=Timeout in seconds is optional timeout for entire javascript script execution"`
 	// description: |
 	//   StopAtFirstMatch stops processing the request at first match.
 	StopAtFirstMatch bool `yaml:"stop-at-first-match,omitempty" json:"stop-at-first-match,omitempty" jsonschema:"title=stop at first match,description=Stop the execution after a match is found"`
@@ -150,8 +150,9 @@ func (request *Request) Compile(options *protocols.ExecutorOptions) error {
 		}
 
 		opts := &compiler.ExecuteOptions{
-			Timeout: request.Timeout,
-			Source:  &request.Init,
+			TimeoutVariants: request.options.Options.GetTimeouts(),
+			Source:          &request.Init,
+			Context:         context.Background(),
 		}
 		// register 'export' function to export variables from init code
 		// these are saved in args and are available in pre-condition and request code
@@ -341,7 +342,10 @@ func (request *Request) ExecuteWithResults(target *contextargs.Context, dynamicV
 		argsCopy.TemplateCtx = templateCtx.GetAll()
 
 		result, err := request.options.JsCompiler.ExecuteWithOptions(request.preConditionCompiled, argsCopy,
-			&compiler.ExecuteOptions{Timeout: request.Timeout, Source: &request.PreCondition})
+			&compiler.ExecuteOptions{
+				TimeoutVariants: requestOptions.Options.GetTimeouts(),
+				Source:          &request.PreCondition, Context: target.Context(),
+			})
 		if err != nil {
 			return errorutil.NewWithTag(request.TemplateID, "could not execute pre-condition: %s", err)
 		}
@@ -357,7 +361,7 @@ func (request *Request) ExecuteWithResults(target *contextargs.Context, dynamicV
 	}
 
 	if request.generator != nil && request.Threads > 1 {
-		request.executeRequestParallel(context.Background(), hostPort, hostname, input, payloadValues, callback)
+		request.executeRequestParallel(target.Context(), hostPort, hostname, input, payloadValues, callback)
 		return nil
 	}
 
@@ -371,6 +375,12 @@ func (request *Request) ExecuteWithResults(target *contextargs.Context, dynamicV
 				return nil
 			}
 
+			select {
+			case <-input.Context().Done():
+				return input.Context().Err()
+			default:
+			}
+
 			if err := request.executeRequestWithPayloads(hostPort, input, hostname, value, payloadValues, func(result *output.InternalWrappedEvent) {
 				if result.OperatorsResult != nil && result.OperatorsResult.Matched {
 					gotMatches = true
@@ -378,11 +388,10 @@ func (request *Request) ExecuteWithResults(target *contextargs.Context, dynamicV
 				}
 				callback(result)
 			}, requestOptions); err != nil {
-				_ = err
-				// Review: should we log error here?
-				// it is technically not error as it is expected to fail
-				// gologger.Warning().Msgf("Could not execute request: %s\n", err)
-				// do not return even if error occured
+				if errkit.IsNetworkPermanentErr(err) {
+					// gologger.Verbose().Msgf("Could not execute request: %s\n", err)
+					return err
+				}
 			}
 			// If this was a match, and we want to stop at first match, skip all further requests.
 			shouldStopAtFirstMatch := request.options.Options.StopAtFirstMatch || request.StopAtFirstMatch
@@ -399,12 +408,16 @@ func (request *Request) executeRequestParallel(ctxParent context.Context, hostPo
 	if threads == 0 {
 		threads = 1
 	}
-	ctx, cancel := context.WithCancel(ctxParent)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(ctxParent)
+	defer cancel(nil)
 	requestOptions := request.options
 	gotmatches := &atomic.Bool{}
 
-	sg := sizedwaitgroup.New(threads)
+	// if request threads matches global payload concurrency we follow it
+	shouldFollowGlobal := threads == request.options.Options.PayloadConcurrency
+
+	sg, _ := syncutil.New(syncutil.WithSize(threads))
+
 	if request.generator != nil {
 		iterator := request.generator.NewIterator()
 		for {
@@ -412,6 +425,20 @@ func (request *Request) executeRequestParallel(ctxParent context.Context, hostPo
 			if !ok {
 				break
 			}
+
+			select {
+			case <-input.Context().Done():
+				return
+			default:
+			}
+
+			// resize check point - nop if there are no changes
+			if shouldFollowGlobal && sg.Size != request.options.Options.PayloadConcurrency {
+				if err := sg.Resize(ctxParent, request.options.Options.PayloadConcurrency); err != nil {
+					gologger.Warning().Msgf("Could not resize workpool: %s\n", err)
+				}
+			}
+
 			sg.Add()
 			go func() {
 				defer sg.Done()
@@ -426,16 +453,15 @@ func (request *Request) executeRequestParallel(ctxParent context.Context, hostPo
 					}
 					callback(result)
 				}, requestOptions); err != nil {
-					_ = err
-					// Review: should we log error here?
-					// it is technically not error as it is expected to fail
-					// gologger.Warning().Msgf("Could not execute request: %s\n", err)
-					// do not return even if error occured
+					if errkit.IsNetworkPermanentErr(err) {
+						cancel(err)
+						return
+					}
 				}
 				// If this was a match, and we want to stop at first match, skip all further requests.
 
 				if shouldStopAtFirstMatch && gotmatches.Load() {
-					cancel()
+					cancel(nil)
 					return
 				}
 			}()
@@ -474,13 +500,16 @@ func (request *Request) executeRequestWithPayloads(hostPort string, input *conte
 	}
 
 	results, err := request.options.JsCompiler.ExecuteWithOptions(request.scriptCompiled, argsCopy,
-		&compiler.ExecuteOptions{Timeout: request.Timeout, Source: &request.Code})
+		&compiler.ExecuteOptions{
+			TimeoutVariants: requestOptions.Options.GetTimeouts(),
+			Source:          &request.Code,
+			Context:         input.Context(),
+		})
 	if err != nil {
 		// shouldn't fail even if it returned error instead create a failure event
 		results = compiler.ExecuteResult{"success": false, "error": err.Error()}
 	}
 	request.options.Progress.IncrementRequests()
-
 	requestOptions.Output.Request(requestOptions.TemplateID, hostPort, request.Type().String(), err)
 	gologger.Verbose().Msgf("[%s] Sent Javascript request to %s", request.options.TemplateID, hostPort)
 
@@ -518,6 +547,46 @@ func (request *Request) executeRequestWithPayloads(hostPort string, input *conte
 	data["template-info"] = requestOptions.TemplateInfo
 	if request.StopAtFirstMatch || request.options.StopAtFirstMatch {
 		data["stop-at-first-match"] = true
+	}
+
+	// add ip address to data
+	if input.MetaInput.CustomIP != "" {
+		data["ip"] = input.MetaInput.CustomIP
+	} else {
+		// context: https://github.com/projectdiscovery/nuclei/issues/5021
+		hostname := input.MetaInput.Input
+		if strings.Contains(hostname, ":") {
+			host, _, err := net.SplitHostPort(hostname)
+			if err == nil {
+				hostname = host
+			} else {
+				// naive way
+				if !strings.Contains(hostname, "]") {
+					hostname = hostname[:strings.LastIndex(hostname, ":")]
+				}
+			}
+		}
+		data["ip"] = protocolstate.Dialer.GetDialedIP(hostname)
+		// if input itself was an ip, use it
+		if iputil.IsIP(hostname) {
+			data["ip"] = hostname
+		}
+
+		// if ip is not found,this is because ssh and other protocols do not use fastdialer
+		// although its not perfect due to its use case dial and get ip
+		dnsData, err := protocolstate.Dialer.GetDNSData(hostname)
+		if err == nil {
+			for _, v := range dnsData.A {
+				data["ip"] = v
+				break
+			}
+			if data["ip"] == "" {
+				for _, v := range dnsData.AAAA {
+					data["ip"] = v
+					break
+				}
+			}
+		}
 	}
 
 	// add and get values from templatectx
