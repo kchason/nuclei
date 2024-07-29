@@ -65,7 +65,21 @@ func (customTemplate *customTemplateGitHubRepo) Update(ctx context.Context) {
 // NewGitHubProviders returns new instance of GitHub providers for downloading custom templates
 func NewGitHubProviders(options *types.Options) ([]*customTemplateGitHubRepo, error) {
 	providers := []*customTemplateGitHubRepo{}
-	gitHubClient := getGHClientIncognito()
+	// If the user has provided GitHub app key and installation ID, then use it to create the client instead of an
+	// incognito client or a client with a token
+	var gitHubClient *github.Client
+	if options.GitHubAppID > 0 && options.GitHubInstallationID > 0 {
+		// Determine if the user provided a private key or a path to a private key
+		if options.GitHubAppKey != "" {
+			gitHubClient = getGHClientWithAppCert(options.GitHubAppID, options.GitHubInstallationID, []byte(options.GitHubAppKey))
+		} else if options.GitHubAppKeyFile != "" {
+			gitHubClient = getGHClientWithAppCertPath(options.GitHubAppID, options.GitHubInstallationID, options.GitHubAppKeyFile)
+		} else {
+			gologger.Fatal().Msgf("GitHub App key or App key file is required for GitHub App authentication")
+		}
+	} else {
+		gitHubClient = getGHClientIncognito()
+	}
 
 	if options.GitHubTemplateDisableDownload {
 		return providers, nil
