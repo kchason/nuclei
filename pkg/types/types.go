@@ -322,6 +322,14 @@ type Options struct {
 	GitHubTemplateRepo []string
 	// GitHubTemplateDisableDownload disables downloading templates from custom GitHub repositories
 	GitHubTemplateDisableDownload bool
+	// GitHubAppID is the GitHub App ID to use for downloading templates with application authentication
+	GitHubAppID int64
+	// GitHubInstallationID is the GitHub Installation ID to use for downloading templates with application authentication
+	GitHubInstallationID int64
+	// GitHubAppKey is the GitHub App Key to use for downloading templates with application authentication
+	GitHubAppKey string
+	// GitHubAppKeyFile is the path to the GitHub App Key file to use for downloading templates with application authentication
+	GitHubAppKeyFile string
 	// GitLabServerURL is the gitlab server to use for custom templates
 	GitLabServerURL string
 	// GitLabToken used to clone/pull from private repos for custom templates

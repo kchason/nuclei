@@ -406,6 +406,27 @@ func readEnvInputVars(options *types.Options) {
 	if repolist != "" {
 		options.GitHubTemplateRepo = append(options.GitHubTemplateRepo, stringsutil.SplitAny(repolist, ",")...)
 	}
+	// Convert the GitHubAppID to an integer if it is not empty
+	githubAppIDString := os.Getenv("GITHUB_APP_ID")
+	if githubAppIDString != "" {
+		githubAppIDInt, err := strconv.ParseInt(githubAppIDString, 10, 64)
+		if err != nil {
+			gologger.Warning().Msgf("Invalid GitHub App ID: %s", options.GitHubAppID)
+		}
+		options.GitHubAppID = githubAppIDInt
+	}
+	// Convert the GitHubInstallationID to an integer if it is not empty
+	githubInstallationIDString := os.Getenv("GITHUB_INSTALLATION_ID")
+	if githubInstallationIDString != "" {
+		githubInstallationIDInt, err := strconv.ParseInt(githubInstallationIDString, 10, 64)
+		if err != nil {
+			gologger.Warning().Msgf("Invalid GitHub Installation ID: %s", options.GitHubInstallationID)
+		}
+		options.GitHubInstallationID = githubInstallationIDInt
+
+	}
+	options.GitHubAppKey = os.Getenv("GITHUB_APP_KEY")
+	options.GitHubAppKeyFile = os.Getenv("GITHUB_APP_KEY_FILE")
 
 	// GitLab options for downloading templates from a repository
 	options.GitLabServerURL = os.Getenv("GITLAB_SERVER_URL")
