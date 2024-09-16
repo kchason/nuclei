@@ -6,7 +6,6 @@ import (
 	"github.com/cespare/xxhash"
 )
 
-
 // TmplClusterKey generates a unique key for the request
 // to be used in the clustering process.
 func (request *Request) TmplClusterKey() uint64 {

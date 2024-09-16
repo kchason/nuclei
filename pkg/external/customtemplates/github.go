@@ -2,16 +2,10 @@ package customtemplates
 
 import (
 	"context"
-	"github.com/jferrl/go-githubauth"
-	"io"
-	httpclient "net/http"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/github"
+	"github.com/jferrl/go-githubauth"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/catalog/config"
@@ -19,6 +13,11 @@ import (
 	fileutil "github.com/projectdiscovery/utils/file"
 	folderutil "github.com/projectdiscovery/utils/folder"
 	"golang.org/x/oauth2"
+	"io"
+	httpclient "net/http"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 var _ Provider = &customTemplateGitHubRepo{}
@@ -28,9 +27,10 @@ type customTemplateGitHubRepo struct {
 	reponame    string
 	gitCloneURL string
 	githubToken string
+	auth        *http.BasicAuth
 }
 
-// This function download the custom github template repository
+// Download This function download the custom github template repository
 func (customTemplate *customTemplateGitHubRepo) Download(ctx context.Context) {
 	clonePath := customTemplate.getLocalRepoClonePath(config.DefaultConfig.CustomGitHubTemplatesDirectory)
 
@@ -49,7 +49,7 @@ func (customTemplate *customTemplateGitHubRepo) Update(ctx context.Context) {
 	downloadPath := config.DefaultConfig.CustomGitHubTemplatesDirectory
 	clonePath := customTemplate.getLocalRepoClonePath(downloadPath)
 
-	// If folder does not exits then clone/download the repo
+	// If folder does not exist then clone/download the repo
 	if !fileutil.FolderExists(clonePath) {
 		customTemplate.Download(ctx)
 		return
@@ -65,6 +65,7 @@ func (customTemplate *customTemplateGitHubRepo) Update(ctx context.Context) {
 // NewGitHubProviders returns new instance of GitHub providers for downloading custom templates
 func NewGitHubProviders(options *types.Options) ([]*customTemplateGitHubRepo, error) {
 	providers := []*customTemplateGitHubRepo{}
+	var auth *http.BasicAuth
 	// If the user has provided GitHub app key and installation ID, then use it to create the client instead of an
 	// incognito client or a client with a token
 	var gitHubClient *github.Client
@@ -76,6 +77,10 @@ func NewGitHubProviders(options *types.Options) ([]*customTemplateGitHubRepo, er
 			gitHubClient = getGHClientWithAppCertPath(options.GitHubAppID, options.GitHubInstallationID, options.GitHubAppKeyFile)
 		} else {
 			gologger.Fatal().Msgf("GitHub App key or App key file is required for GitHub App authentication")
+		}
+		// If the client was created, then generate an auth object from the installation ID
+		if gitHubClient != nil {
+			auth = getApplicationAuth(gitHubClient, options.GitHubInstallationID, context.Background())
 		}
 	} else {
 		gitHubClient = getGHClientIncognito()
@@ -96,12 +101,18 @@ func NewGitHubProviders(options *types.Options) ([]*customTemplateGitHubRepo, er
 			gologger.Error().Msgf("%s", err)
 			continue
 		}
+		// If there is a token set, then generate the basic auth object
+		if options.GitHubToken != "" {
+			auth = getAuth(owner, options.GitHubToken)
+		}
 		customTemplateRepo := &customTemplateGitHubRepo{
 			owner:       owner,
 			reponame:    repo,
 			gitCloneURL: githubRepo.GetCloneURL(),
 			githubToken: options.GitHubToken,
+			auth:        auth,
 		}
+
 		providers = append(providers, customTemplateRepo)
 
 		customTemplateRepo.restructureRepoDir()
@@ -156,7 +167,7 @@ getRepo:
 func (ctr *customTemplateGitHubRepo) cloneRepo(clonePath, githubToken string) error {
 	r, err := git.PlainClone(clonePath, false, &git.CloneOptions{
 		URL:  ctr.gitCloneURL,
-		Auth: getAuth(ctr.owner, githubToken),
+		Auth: ctr.auth,
 	})
 	if err != nil {
 		return errors.Errorf("%s/%s: %s", ctr.owner, ctr.reponame, err.Error())
@@ -177,7 +188,7 @@ func (ctr *customTemplateGitHubRepo) pullChanges(repoPath, githubToken string) e
 	if err != nil {
 		return err
 	}
-	err = w.Pull(&git.PullOptions{RemoteName: "origin", Auth: getAuth(ctr.owner, githubToken)})
+	err = w.Pull(&git.PullOptions{RemoteName: "origin", Auth: ctr.auth})
 	if err != nil {
 		return errors.Errorf("%s/%s: %s", ctr.owner, ctr.reponame, err.Error())
 	}
@@ -195,6 +206,20 @@ func getAuth(username, password string) *http.BasicAuth {
 		return &http.BasicAuth{Username: username, Password: password}
 	}
 	return nil
+}
+
+// getApplicationAuth creates a basic auth object for the given installation ID and GitHub client
+func getApplicationAuth(client *github.Client, installationID int64, ctx context.Context) *http.BasicAuth {
+	installation, _, err := client.Apps.CreateInstallationToken(ctx, installationID)
+	if err != nil {
+		gologger.Fatal().Msgf("Error creating installation token: %s", err)
+		return nil
+	}
+
+	return &http.BasicAuth{
+		Username: "x-access-token",
+		Password: installation.GetToken(),
+	}
 }
 
 func getGHClientWithToken(token string) *github.Client {
