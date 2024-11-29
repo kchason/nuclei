@@ -298,6 +298,27 @@ func (store *Store) LoadTemplatesOnlyMetadata() error {
 
 	for templatePath := range validPaths {
 		template, _, _ := templatesCache.Has(templatePath)
+
+		if len(template.RequestsHeadless) > 0 && !store.config.ExecutorOptions.Options.Headless {
+			continue
+		}
+
+		if len(template.RequestsCode) > 0 && !store.config.ExecutorOptions.Options.EnableCodeTemplates {
+			continue
+		}
+
+		if template.IsFuzzing() && !store.config.ExecutorOptions.Options.DAST {
+			continue
+		}
+
+		if template.SelfContained && !store.config.ExecutorOptions.Options.EnableSelfContainedTemplates {
+			continue
+		}
+
+		if template.HasFileProtocol() && !store.config.ExecutorOptions.Options.EnableFileTemplates {
+			continue
+		}
+
 		if template != nil {
 			template.Path = templatePath
 			store.templates = append(store.templates, template)
@@ -489,6 +510,17 @@ func (store *Store) LoadTemplatesWithTags(templatesList, tags []string) []*templ
 						stats.Increment(templates.SkippedUnsignedStats)
 						return
 					}
+
+					if parsed.SelfContained && !store.config.ExecutorOptions.Options.EnableSelfContainedTemplates {
+						stats.Increment(templates.ExcludedSelfContainedStats)
+						return
+					}
+
+					if parsed.HasFileProtocol() && !store.config.ExecutorOptions.Options.EnableFileTemplates {
+						stats.Increment(templates.ExcludedFileStats)
+						return
+					}
+
 					// if template has request signature like aws then only signed and verified templates are allowed
 					if parsed.UsesRequestSignature() && !parsed.Verified {
 						stats.Increment(templates.SkippedRequestSignatureStats)
