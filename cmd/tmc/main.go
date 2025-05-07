@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolstate"
 	"github.com/projectdiscovery/nuclei/v3/pkg/templates"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
+	"github.com/projectdiscovery/nuclei/v3/pkg/utils/json"
 	"github.com/projectdiscovery/retryablehttp-go"
 	errorutil "github.com/projectdiscovery/utils/errors"
 	"gopkg.in/yaml.v3"
@@ -65,7 +65,6 @@ func init() {
 		allTagsRegex = append(allTagsRegex, re)
 	}
 
-	defaultOpts := types.DefaultOptions()
 	// need to set headless to true for headless templates
 	defaultOpts.Headless = true
 	defaultOpts.EnableCodeTemplates = true
@@ -132,7 +131,7 @@ func main() {
 }
 
 func process(opts options) error {
-	tempDir, err := os.MkdirTemp("", "nuclei-nvd-%s")
+	tempDir, err := os.MkdirTemp("", "nuclei-nvd")
 	if err != nil {
 		return err
 	}

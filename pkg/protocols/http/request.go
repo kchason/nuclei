@@ -20,6 +20,7 @@ import (
 	"github.com/projectdiscovery/fastdialer/fastdialer"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/nuclei/v3/pkg/fuzz/analyzers"
+	fuzzStats "github.com/projectdiscovery/nuclei/v3/pkg/fuzz/stats"
 	"github.com/projectdiscovery/nuclei/v3/pkg/operators"
 	"github.com/projectdiscovery/nuclei/v3/pkg/output"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols"
@@ -40,7 +41,6 @@ import (
 	"github.com/projectdiscovery/rawhttp"
 	convUtil "github.com/projectdiscovery/utils/conversion"
 	"github.com/projectdiscovery/utils/errkit"
-	errorutil "github.com/projectdiscovery/utils/errors"
 	httpUtils "github.com/projectdiscovery/utils/http"
 	"github.com/projectdiscovery/utils/reader"
 	sliceutil "github.com/projectdiscovery/utils/slice"
@@ -483,7 +483,6 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 				if err == types.ErrNoMoreRequests {
 					return true, nil
 				}
-				request.options.Progress.IncrementFailedRequestsBy(int64(generator.Total()))
 				return true, err
 			}
 			// ideally if http template used a custom port or hostname
@@ -540,14 +539,19 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 			if errors.Is(execReqErr, ErrMissingVars) {
 				return true, nil
 			}
+
 			if execReqErr != nil {
+				request.markHostError(updatedInput, execReqErr)
+
 				// if applicable mark the host as unresponsive
-				requestErr = errorutil.NewWithErr(execReqErr).Msgf("got err while executing %v", generatedHttpRequest.URL())
+				reqKitErr := errkit.FromError(execReqErr)
+				reqKitErr.Msgf("got err while executing %v", generatedHttpRequest.URL())
+
+				requestErr = reqKitErr
 				request.options.Progress.IncrementFailedRequestsBy(1)
 			} else {
 				request.options.Progress.IncrementRequests()
 			}
-			request.markHostError(updatedInput, execReqErr)
 
 			// If this was a match, and we want to stop at first match, skip all further requests.
 			shouldStopAtFirstMatch := generatedHttpRequest.original.options.Options.StopAtFirstMatch || generatedHttpRequest.original.options.StopAtFirstMatch || request.StopAtFirstMatch
@@ -584,6 +588,7 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 			requestErr = gotErr
 		}
 		if skip || gotErr != nil {
+			request.options.Progress.SetRequests(uint64(generator.Remaining() + 1))
 			break
 		}
 	}
@@ -900,6 +905,10 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		if err := respChain.Fill(); err != nil {
 			return errors.Wrap(err, "could not generate response chain")
 		}
+
+		// log request stats
+		request.options.Output.RequestStatsLog(strconv.Itoa(respChain.Response().StatusCode), respChain.FullResponse().String())
+
 		// save response to projectfile
 		onceFunc()
 		matchedURL := input.MetaInput.Input
@@ -1012,6 +1021,21 @@ func (request *Request) executeRequest(input *contextargs.Context, generatedRequ
 		dumpResponse(event, request, respChain.FullResponse().Bytes(), formedURL, responseContentType, isResponseTruncated, input.MetaInput.Input)
 
 		callback(event)
+
+		if request.options.FuzzStatsDB != nil && generatedRequest.fuzzGeneratedRequest.Request != nil {
+			request.options.FuzzStatsDB.RecordResultEvent(fuzzStats.FuzzingEvent{
+				URL:           input.MetaInput.Target(),
+				TemplateID:    request.options.TemplateID,
+				ComponentType: generatedRequest.fuzzGeneratedRequest.Component.Name(),
+				ComponentName: generatedRequest.fuzzGeneratedRequest.Parameter,
+				PayloadSent:   generatedRequest.fuzzGeneratedRequest.Value,
+				StatusCode:    respChain.Response().StatusCode,
+				Matched:       event.HasResults(),
+				RawRequest:    string(dumpedRequest),
+				RawResponse:   respChain.FullResponse().String(),
+				Severity:      request.options.TemplateInfo.SeverityHolder.Severity.String(),
+			})
+		}
 
 		// Skip further responses if we have stop-at-first-match and a match
 		if (request.options.Options.StopAtFirstMatch || request.options.StopAtFirstMatch || request.StopAtFirstMatch) && event.HasResults() {
@@ -1192,7 +1216,7 @@ func (request *Request) newContext(input *contextargs.Context) context.Context {
 
 // markHostError checks if the error is a unreponsive host error and marks it
 func (request *Request) markHostError(input *contextargs.Context, err error) {
-	if request.options.HostErrorsCache != nil {
+	if request.options.HostErrorsCache != nil && err != nil {
 		request.options.HostErrorsCache.MarkFailedOrRemove(request.options.ProtocolType.String(), input, err)
 	}
 }

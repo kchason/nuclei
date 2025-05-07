@@ -171,6 +171,11 @@ func ValidateOptions(options *types.Options) error {
 	if options.Validate {
 		validateTemplatePaths(config.DefaultConfig.TemplatesDirectory, options.Templates, options.Workflows)
 	}
+	if options.DAST {
+		if err := validateDASTOptions(options); err != nil {
+			return err
+		}
+	}
 
 	// Verify if any of the client certificate options were set since it requires all three to work properly
 	if options.HasClientCertificates() {
@@ -230,15 +235,25 @@ func validateMissingS3Options(options *types.Options) []string {
 	if options.AwsBucketName == "" {
 		missing = append(missing, "AWS_TEMPLATE_BUCKET")
 	}
-	if options.AwsAccessKey == "" {
-		missing = append(missing, "AWS_ACCESS_KEY")
+	if options.AwsProfile == "" {
+		var missingCreds []string
+		if options.AwsAccessKey == "" {
+			missingCreds = append(missingCreds, "AWS_ACCESS_KEY")
+		}
+		if options.AwsSecretKey == "" {
+			missingCreds = append(missingCreds, "AWS_SECRET_KEY")
+		}
+		if options.AwsRegion == "" {
+			missingCreds = append(missingCreds, "AWS_REGION")
+		}
+
+		missing = append(missing, missingCreds...)
+
+		if len(missingCreds) > 0 {
+			missing = append(missing, "AWS_PROFILE")
+		}
 	}
-	if options.AwsSecretKey == "" {
-		missing = append(missing, "AWS_SECRET_KEY")
-	}
-	if options.AwsRegion == "" {
-		missing = append(missing, "AWS_REGION")
-	}
+
 	return missing
 }
 
@@ -272,6 +287,14 @@ func validateMissingGitLabOptions(options *types.Options) []string {
 	}
 
 	return missing
+}
+
+func validateDASTOptions(options *types.Options) error {
+	// Ensure the DAST server token meets minimum length requirement
+	if len(options.DASTServerToken) > 0 && len(options.DASTServerToken) < 16 {
+		return fmt.Errorf("DAST server token must be at least 16 characters long")
+	}
+	return nil
 }
 
 func createReportingOptions(options *types.Options) (*reporting.Options, error) {
@@ -436,6 +459,7 @@ func readEnvInputVars(options *types.Options) {
 	options.AwsSecretKey = os.Getenv("AWS_SECRET_KEY")
 	options.AwsBucketName = os.Getenv("AWS_TEMPLATE_BUCKET")
 	options.AwsRegion = os.Getenv("AWS_REGION")
+	options.AwsProfile = os.Getenv("AWS_PROFILE")
 
 	// Azure options for downloading templates from an Azure Blob Storage container
 	options.AzureContainerName = os.Getenv("AZURE_CONTAINER_NAME")

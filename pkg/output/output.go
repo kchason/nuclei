@@ -50,8 +50,12 @@ type Writer interface {
 	WriteFailure(*InternalWrappedEvent) error
 	// Request logs a request in the trace log
 	Request(templateID, url, requestType string, err error)
+	// RequestStatsLog logs a request stats log
+	RequestStatsLog(statusCode, response string)
 	//  WriteStoreDebugData writes the request/response debug data to file
 	WriteStoreDebugData(host, templateID, eventType string, data string)
+	// ResultCount returns the total number of results written
+	ResultCount() int
 }
 
 // StandardWriter is a writer writing output to file and screen for results.
@@ -73,7 +77,15 @@ type StandardWriter struct {
 	DisableStdout         bool
 	AddNewLinesOutputFile bool // by default this is only done for stdout
 	KeysToRedact          []string
+
+	// JSONLogRequestHook is a hook that can be used to log request/response
+	// when using custom server code with output
+	JSONLogRequestHook func(*JSONLogRequest)
+
+	resultCount atomic.Int32
 }
+
+var _ Writer = &StandardWriter{}
 
 var decolorizerRegex = regexp.MustCompile(`\x1B\[[0-9;]*[a-zA-Z]`)
 
@@ -271,7 +283,16 @@ func NewStandardWriter(options *types.Options) (*StandardWriter, error) {
 		omitTemplate:     options.OmitTemplate,
 		KeysToRedact:     options.Redact,
 	}
+
+	if v := os.Getenv("DISABLE_STDOUT"); v == "true" || v == "1" {
+		writer.DisableStdout = true
+	}
+
 	return writer, nil
+}
+
+func (w *StandardWriter) ResultCount() int {
+	return int(w.resultCount.Load())
 }
 
 // Write writes the event to file and/or screen.
@@ -317,12 +338,13 @@ func (w *StandardWriter) Write(event *ResultEvent) error {
 			data = decolorizerRegex.ReplaceAll(data, []byte(""))
 		}
 		if _, writeErr := w.outputFile.Write(data); writeErr != nil {
-			return errors.Wrap(err, "could not write to output")
+			return errors.Wrap(writeErr, "could not write to output")
 		}
 		if w.AddNewLinesOutputFile && w.json {
 			_, _ = w.outputFile.Write([]byte("\n"))
 		}
 	}
+	w.resultCount.Add(1)
 	return nil
 }
 
@@ -348,18 +370,40 @@ type JSONLogRequest struct {
 
 // Request writes a log the requests trace log
 func (w *StandardWriter) Request(templatePath, input, requestType string, requestErr error) {
-	if w.traceFile == nil && w.errorFile == nil {
+	if w.traceFile == nil && w.errorFile == nil && w.JSONLogRequestHook == nil {
 		return
 	}
+
+	request := getJSONLogRequestFromError(templatePath, input, requestType, requestErr)
+	if w.timestamp {
+		ts := time.Now()
+		request.Timestamp = &ts
+	}
+	data, err := jsoniter.Marshal(request)
+	if err != nil {
+		return
+	}
+
+	if w.JSONLogRequestHook != nil {
+		w.JSONLogRequestHook(request)
+	}
+
+	if w.traceFile != nil {
+		_, _ = w.traceFile.Write(data)
+	}
+
+	if requestErr != nil && w.errorFile != nil {
+		_, _ = w.errorFile.Write(data)
+	}
+}
+
+func getJSONLogRequestFromError(templatePath, input, requestType string, requestErr error) *JSONLogRequest {
 	request := &JSONLogRequest{
 		Template: templatePath,
 		Input:    input,
 		Type:     requestType,
 	}
-	if w.timestamp {
-		ts := time.Now()
-		request.Timestamp = &ts
-	}
+
 	parsed, _ := urlutil.ParseAbsoluteURL(input, false)
 	if parsed != nil {
 		request.Address = parsed.Hostname()
@@ -397,18 +441,7 @@ func (w *StandardWriter) Request(templatePath, input, requestType string, reques
 	if val := errkit.GetAttrValue(requestErr, "address"); val.Any() != nil {
 		request.Address = val.String()
 	}
-	data, err := jsoniter.Marshal(request)
-	if err != nil {
-		return
-	}
-
-	if w.traceFile != nil {
-		_, _ = w.traceFile.Write(data)
-	}
-
-	if requestErr != nil && w.errorFile != nil {
-		_, _ = w.errorFile.Write(data)
-	}
+	return request
 }
 
 // Colorizer returns the colorizer instance for writer
@@ -512,6 +545,13 @@ func sanitizeFileName(fileName string) string {
 }
 func (w *StandardWriter) WriteStoreDebugData(host, templateID, eventType string, data string) {
 	if w.storeResponse {
+		if len(host) > 60 {
+			host = host[:57] + "..."
+		}
+		if len(templateID) > 100 {
+			templateID = templateID[:97] + "..."
+		}
+
 		filename := sanitizeFileName(fmt.Sprintf("%s_%s", host, templateID))
 		subFolder := filepath.Join(w.storeResponseDir, sanitizeFileName(eventType))
 		if !fileutil.FolderExists(subFolder) {
@@ -526,7 +566,6 @@ func (w *StandardWriter) WriteStoreDebugData(host, templateID, eventType string,
 		_, _ = f.WriteString(fmt.Sprintln(data))
 		f.Close()
 	}
-
 }
 
 // tryParseCause tries to parse the cause of given error
@@ -540,12 +579,14 @@ func tryParseCause(err error) error {
 	if strings.HasPrefix(msg, "ReadStatusLine:") {
 		// last index is actual error (from rawhttp)
 		parts := strings.Split(msg, ":")
-		return errkit.New("%s", strings.TrimSpace(parts[len(parts)-1]))
+		return errkit.New(strings.TrimSpace(parts[len(parts)-1]))
 	}
 	if strings.Contains(msg, "read ") {
 		// same here
 		parts := strings.Split(msg, ":")
-		return errkit.New("%s", strings.TrimSpace(parts[len(parts)-1]))
+		return errkit.New(strings.TrimSpace(parts[len(parts)-1]))
 	}
 	return err
 }
+
+func (w *StandardWriter) RequestStatsLog(statusCode, response string) {}

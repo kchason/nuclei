@@ -107,8 +107,11 @@ func (e *Engine) executeTemplateSpray(ctx context.Context, templatesList []*temp
 	// wp is workpool that contains different waitgroups for
 	// headless and non-headless templates
 	wp := e.GetWorkPool()
+	defer wp.Wait()
 
 	for _, template := range templatesList {
+		template := template
+
 		select {
 		case <-ctx.Done():
 			return results
@@ -135,7 +138,6 @@ func (e *Engine) executeTemplateSpray(ctx context.Context, templatesList []*temp
 			e.executeTemplateWithTargets(ctx, tpl, target, results)
 		}(template)
 	}
-	wp.Wait()
 	return results
 }
 
@@ -143,6 +145,7 @@ func (e *Engine) executeTemplateSpray(ctx context.Context, templatesList []*temp
 func (e *Engine) executeHostSpray(ctx context.Context, templatesList []*templates.Template, target provider.InputProvider) *atomic.Bool {
 	results := &atomic.Bool{}
 	wp, _ := syncutil.New(syncutil.WithSize(e.options.BulkSize + e.options.HeadlessBulkSize))
+	defer wp.Wait()
 
 	target.Iterate(func(value *contextargs.MetaInput) bool {
 		select {
@@ -158,7 +161,6 @@ func (e *Engine) executeHostSpray(ctx context.Context, templatesList []*template
 		}(value)
 		return true
 	})
-	wp.Wait()
 	return results
 }
 

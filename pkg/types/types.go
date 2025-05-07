@@ -42,6 +42,8 @@ type Options struct {
 	Templates goflags.StringSlice
 	// TemplateURLs specifies URLs to a list of templates to use
 	TemplateURLs goflags.StringSlice
+	// AITemplatePrompt specifies prompt to generate template using AI
+	AITemplatePrompt string
 	// RemoteTemplates specifies list of allowed URLs to load remote templates from
 	RemoteTemplateDomainList goflags.StringSlice
 	// 	ExcludedTemplates  specifies the template/templates to exclude
@@ -223,6 +225,8 @@ type Options struct {
 	JSONRequests bool
 	// OmitRawRequests omits requests/responses for matches in JSON output
 	OmitRawRequests bool
+	// HTTPStats enables http statistics tracking and display.
+	HTTPStats bool
 	// OmitTemplate omits encoded template from JSON output
 	OmitTemplate bool
 	// JSONExport is the file to export JSON output format to
@@ -341,6 +345,8 @@ type Options struct {
 	GitLabTemplateRepositoryIDs []int
 	// GitLabTemplateDisableDownload disables downloading templates from custom GitLab repositories
 	GitLabTemplateDisableDownload bool
+	// AWS access profile from ~/.aws/credentials file for downloading templates from S3 bucket
+	AwsProfile string
 	// AWS access key for downloading templates from S3 bucket
 	AwsAccessKey string
 	// AWS secret key for downloading templates from S3 bucket
@@ -419,6 +425,18 @@ type Options struct {
 	ProbeConcurrency int
 	// Dast only runs DAST templates
 	DAST bool
+	// DASTServer is the flag to start nuclei as a DAST server
+	DASTServer bool
+	// DASTServerToken is the token optional for the dast server
+	DASTServerToken string
+	// DASTServerAddress is the address for the dast server
+	DASTServerAddress string
+	// DASTReport enables dast report server & final report generation
+	DASTReport bool
+	// Scope contains a list of regexes for in-scope URLS
+	Scope goflags.StringSlice
+	// OutOfScope contains a list of regexes for out-scope URLS
+	OutOfScope goflags.StringSlice
 	// HttpApiEndpoint is the experimental http api endpoint
 	HttpApiEndpoint string
 	// ListTemplateProfiles lists all available template profiles

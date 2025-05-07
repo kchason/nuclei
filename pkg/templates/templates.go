@@ -2,7 +2,6 @@
 package templates
 
 import (
-	"encoding/json"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -24,6 +23,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/whois"
 	"github.com/projectdiscovery/nuclei/v3/pkg/templates/types"
 	"github.com/projectdiscovery/nuclei/v3/pkg/utils"
+	"github.com/projectdiscovery/nuclei/v3/pkg/utils/json"
 	"github.com/projectdiscovery/nuclei/v3/pkg/workflows"
 	errorutil "github.com/projectdiscovery/utils/errors"
 	fileutil "github.com/projectdiscovery/utils/file"
@@ -317,7 +317,7 @@ func (template *Template) MarshalYAML() ([]byte, error) {
 	return out, multierr.Append(marshalErr, errValidate)
 }
 
-// MarshalYAML forces recursive struct validation after unmarshal operation
+// UnmarshalYAML forces recursive struct validation after unmarshal operation
 func (template *Template) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type Alias Template
 	alias := &Alias{}
@@ -475,7 +475,7 @@ func (template *Template) GetFileImports() []string {
 	return template.ImportedFiles
 }
 
-// addProtocolsToQueue adds protocol requests to the queue and preserves order of the protocols and requests
+// addRequestsToQueue adds protocol requests to the queue and preserves order of the protocols and requests
 func (template *Template) addRequestsToQueue(keys ...string) {
 	for _, key := range keys {
 		switch key {
