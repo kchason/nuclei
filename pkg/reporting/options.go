@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/codequality"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/es"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/jsonexporter"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/jsonl"
@@ -47,6 +48,8 @@ type Options struct {
 	JSONLExporter *jsonl.Options `yaml:"jsonl"`
 	// MongoDBExporter containers the configuration options for the MongoDB Exporter Module
 	MongoDBExporter *mongo.Options `yaml:"mongodb"`
+	// CodeQualityExporter contains the configuration options for the GitLab CodeQuality Exporter Module
+	CodeQualityExporter *codequality.Options `yaml:"codequality"`
 
 	HttpClient *retryablehttp.Client `yaml:"-"`
 	OmitRaw    bool                  `yaml:"-"`

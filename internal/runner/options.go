@@ -22,6 +22,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/utils/vardump"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/headless/engine"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting"
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/codequality"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/jsonexporter"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/jsonl"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/markdown"
@@ -338,6 +339,11 @@ func createReportingOptions(options *types.Options) (*reporting.Options, error) 
 				File:    options.JSONLExport,
 				OmitRaw: options.OmitRawRequests,
 			}
+		}
+	}
+	if options.CodeQualityExport != "" {
+		reportingOptions.CodeQualityExporter = &codequality.Options{
+			File: options.CodeQualityExport,
 		}
 	}
 

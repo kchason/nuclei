@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/codequality"
 	"github.com/projectdiscovery/nuclei/v3/pkg/reporting/exporters/mongo"
 
 	"github.com/projectdiscovery/gologger"
@@ -170,6 +171,13 @@ func New(options *Options, db string, doNotDedupe bool) (Client, error) {
 	}
 	if options.MongoDBExporter != nil {
 		exporter, err := mongo.New(options.MongoDBExporter)
+		if err != nil {
+			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
+		}
+		client.exporters = append(client.exporters, exporter)
+	}
+	if options.CodeQualityExporter != nil {
+		exporter, err := codequality.New(options.CodeQualityExporter)
 		if err != nil {
 			return nil, errorutil.NewWithErr(err).Wrap(ErrExportClientCreation)
 		}

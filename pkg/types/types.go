@@ -233,6 +233,8 @@ type Options struct {
 	JSONExport string
 	// JSONLExport is the file to export JSONL output format to
 	JSONLExport string
+	// CodeQualityExport is the file to export CodeQuality output to
+	CodeQualityExport string
 	// Redact redacts given keys in
 	Redact goflags.StringSlice
 	// EnableProgressBar enables progress bar
